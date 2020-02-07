@@ -14,11 +14,14 @@ DB_PASSWORD = utils.decrypt_secret(
 )
 
 if 'db_ip' in config.database:
-    SACN = 'mysql+pymysql://{}:{}@{}:3306/{}?charset=utf8'.format(
+    SACN = 'mysql://{}:{}@{}:3306/{}?charset=utf8&ssl_ca={}&ssl_cert={}&ssl_key={}'.format(
         config.database['db_user'],
         DB_PASSWORD,
         config.database['db_ip'],
-        config.database['db_name']
+        config.database['db_name'],
+        config.database['server_ca'],
+        config.database['client_ca'],
+        config.database['client_key']
     )
 else:
     SACN = 'mysql+pymysql://{}:{}@/{}?unix_socket=/cloudsql/{}:europe-west1:{}'.format(
