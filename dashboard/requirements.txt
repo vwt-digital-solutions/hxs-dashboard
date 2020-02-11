@@ -22,3 +22,4 @@ PyPDF2==1.26.0
 plotly==3.10.0
 gcsfs==0.3.1
 Flask-SSLify==0.1.5
+mysqlclient==1.4.6
