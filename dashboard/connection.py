@@ -14,7 +14,7 @@ DB_PASSWORD = utils.decrypt_secret(
 )
 
 if 'db_ip' in config.database:
-    SACN = 'mysql://{}:{}@{}:3306/{}?charset=utf8&ssl_ca={}&ssl_cert={}&ssl_key={}'.format(
+    SACN = 'mysql+mysqlconnector://{}:{}@{}:3306/{}?charset=utf8&ssl_ca={}&ssl_cert={}&ssl_key={}'.format(
         config.database['db_user'],
         DB_PASSWORD,
         config.database['db_ip'],
