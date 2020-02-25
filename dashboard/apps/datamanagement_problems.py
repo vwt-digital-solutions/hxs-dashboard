@@ -136,7 +136,8 @@ def get_problem_table(overview, pr_dropdown_values, category_values, status):
     mask = overview.index.notna()
     for el in pr_dropdown_values:
         if el == 'Geen constateringen':
-            mask &= (overview['Projectstructuur constateringen'] == '')
+            mask &= ((overview['Projectstructuur constateringen'] == '') |
+                     (overview['Projectstructuur constateringen'].isna()))
         else:
             mask &= (overview['Projectstructuur constateringen'].str.contains(el, regex=False))
     mask &= (overview['categorie'].isin(category_values))

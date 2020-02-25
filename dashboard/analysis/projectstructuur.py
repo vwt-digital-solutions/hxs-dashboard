@@ -4,6 +4,7 @@ import config
 import numpy as np
 import pandas as pd
 import sqlalchemy as sa
+import re
 
 from analysis.connectz import expand_column
 from datetime import datetime as dt
@@ -18,14 +19,14 @@ def merge_columns_text(df, columnnames, columnname_new=None, connector='; '):
 
     for i in range(len(columnnames)-1):
         place = (
-            (df[columnnames[i]].notna()) & (df[columnnames[i]] != '') &
-            (df[columnnames[i+1]].notna()) & (df[columnnames[i+1]] != '')
+            (df[columnnames[i]].notna()) & (df[columnnames[i]].notna()) &
+            (df[columnnames[i+1]].notna()) & (df[columnnames[i+1]].notna())
         )
         df.at[place, columnname_new] = df[place][columnnames[i]] + \
             connector + df[place][columnnames[i+1]]
         df.at[~place, columnname_new] = df[~place][columnnames[i]].fillna(
             '') + df[~place][columnnames[i+1]].fillna('')
-        df.at[(df[columnname_new] == ''), columnname_new] = np.nan
+        df.at[(df[columnname_new].isna()), columnname_new] = np.nan
         columnnames[i+1] = columnname_new
     return df
 
@@ -46,7 +47,6 @@ class cp():
     def _get_data(self, session):
         self.df = read(
             session, self.sourceTag, measure=self.measures)
-
         # Add bpnr
         q_select = sa.select([czHierarchy.kindKey, czHierarchy.parentKindKey]).\
             where(czHierarchy.versionEnd.is_(None)).\
@@ -75,13 +75,13 @@ class cp():
         else:
             self.df = self.df.merge(contractor, on=['bpnr'], how='left')
 
-    def reduceConnectZ(self):
-        self.nb = self.nb[self.nb['contractor'] == 'Connect-Z Utrecht']
+    # def reduceConnectZ(self):
+    #     self.nb = self.nb[self.nb['contractor'] == 'Connect-Z Utrecht']
 
     def splitFrames(self):
         cp = self.df.copy()
         self.nb = cp[cp['project_class'].str.lower().str.contains('nieuwbouw')]
-        self.reduceConnectZ()
+        # self.reduceConnectZ()
         self.rec = cp[(cp['project_class'].str.contains('Reconstructies')) &
                       ~(cp['project_class'].str.contains('Kleine'))]
         self.krec = cp[(cp['project_class'].str.contains('Kleine'))]
@@ -95,7 +95,11 @@ class inforln():
             'ln_project_status',
             'ln_fase',
             'ln_fase_description',
-            'project_description'
+            'project_description',
+            'search_argument',
+            'search_argument2',
+            'type_hierarchy',
+            'main_project'
         ]
 
     def _get_data(self, session):
@@ -130,18 +134,20 @@ class inforln():
         nummer35 = self.df_proj['ln_id'].str.startswith('35')
         nummer45 = self.df_proj['ln_id'].str.startswith('45')
         nummer40 = self.df_proj['ln_id'].str.startswith('40')
+        nummer31 = self.df_proj['ln_id'].str.startswith('31')
         self.df_proj['active_ln'] = self.df_proj['ln_project_status'].str.lower().isin([
             'actief', 'gereed', 'vrij'])
         actief = self.df_proj['active_ln']
-        # LN actieve nieuwbouw projecten (34 en 35 nummers)
+        # LN actieve nieuwbouw projecten (34, 31 en 35 nummers)
         self.df = self.df_proj[(nummer34 | nummer35 |
-                                nummer45 | nummer40) & actief]
-        # Maak set met overige codes (niet 34 of 35)
+                                nummer45 | nummer40 |
+                                nummer31) & actief]
+        # Maak set met overige codes (niet 34 of 35 of 31)
         self.df_non3435 = self.df_proj[~(
-            nummer34 | nummer35 | nummer45 | nummer40) & actief]
+            nummer34 | nummer35 | nummer45 | nummer40 | nummer31) & actief]
         # Maak set met inactieve LN nieuwbouw projecten
         self.df_nonActive = self.df_proj.loc[(
-            nummer34 | nummer35 | nummer45 | nummer40) & ~actief]
+            nummer34 | nummer35 | nummer45 | nummer40 | nummer31) & ~actief]
 
     def filterProjectNumbers(self):
         """Examination of data shows that 31 out of 21169 project numbers have length less than nine, so we filter those out
@@ -514,537 +520,536 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             set(['', np.nan])
 
     ###################################################################################################################
-    # %% Bepaal alles in categorie 34_nieuwbouw en in de categorie 34_vooraanleg
-    overview = ln.df[(ln.df['bpnr'] != '') &
-                     (ln.df['con_opdrachtid'] == '')][['ln_id', 'bpnr']]
+    # Voorbereiding DF
+    ###################################################################################################################
+    # vul alle nan values in ln
+    ln.df.replace('', np.nan, inplace=True)
+    connect.df.replace('', np.nan, inplace=True)
+    connect.df.fillna(value=np.nan, inplace=True)
+    cp.df.replace('', np.nan, inplace=True)
+
+    ###################################################################################################################
+    # Combinaties binnen LN projectstructuur
+    ###################################################################################################################
+    # Bepaal alle combinaties voor 34, 35 en 45 nummers
+    mask = ((ln.df['ln_id'].str.startswith('34')) |
+            (ln.df['ln_id'].str.startswith('35')) |
+            (ln.df['ln_id'].str.startswith('45')))
+    nummer34 = ln.df[mask][['ln_id', 'search_argument', 'search_argument2']].rename(
+        columns={'search_argument': 'con_opdrachtid', 'search_argument2': 'bpnr'})
+
+    mask = ((nummer34['con_opdrachtid'].isna()) & (nummer34['bpnr'].notna()))
+    overview = nummer34[mask][['ln_id', 'bpnr']]
     overview = expand_column(overview, 'bpnr')
-    overview.at[overview.duplicated(subset='ln_id', keep=False),
-                'let_op'] = "foute structuur: LN heeft referentie naar twee ChangePointorders"
     overview = overview.merge(
         connect.df[['bpnr', 'con_opdrachtid']], on='bpnr', how='left').drop_duplicates()
-    overview.at[:, 'categorie'] = "34_nieuwbouw"
-    overview.at[overview['con_opdrachtid'].isna(),
-                'categorie'] = "34_vooraanleg"
-    overview['koppeling'] = "LN > Connect (BPNR)"
+    overview['koppeling'] = 'LN > Con (BPNR)'
+    overview.at[overview['con_opdrachtid'].isna(), 'koppeling'] = 'LN'
 
-    # %% Bepaal alles in categorie 35_aanleg
-    temp = ln.df[(ln.df['bpnr'] == '') &
-                 (ln.df['con_opdrachtid'] != '')][['ln_id', 'con_opdrachtid']].drop_duplicates()
-    temp = expand_column(temp, 'con_opdrachtid')
-    temp.at[temp.duplicated(subset='ln_id', keep=False),
-            'let_op2'] = "foute structuur: LN heeft referentie naar twee ChangePointorders"
-    temp = temp.merge(connect.df[['con_opdrachtid', 'bpnr']],
-                      on='con_opdrachtid', how='left').drop_duplicates()
-    temp.at[:, 'categorie'] = "35_aanleg"
-    temp.at[temp['bpnr'].notna(
-    ), 'let_op'] = "in Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als 35-nummer"
-    temp['koppeling'] = "LN > Connect (ConnID)"
-    # koppeling komt uit Connect, niet uit LN
+    mask = ((nummer34['con_opdrachtid'].notna()) & (nummer34['bpnr'].isna()))
+    temp = nummer34[mask][['ln_id', 'con_opdrachtid']]
+    temp = temp.merge(
+        connect.df[['bpnr', 'con_opdrachtid']], on='con_opdrachtid', how='left').drop_duplicates()
+    temp['koppeling'] = 'LN > Con (opdrachtid)'
+    temp.at[temp['bpnr'].isna(), 'koppeling'] = 'LN'
     overview = overview.append(temp, sort=False)
 
-    # %% overige LN opdrachten: VZ_ontbreekt
-    temp = ln.df[(ln.df['con_opdrachtid'] == '') &
-                 (ln.df['bpnr'] == '')]['ln_id']
-    temp = pd.DataFrame(temp)
-    if len(temp) > 0:
-        temp.at[:, 'categorie'] = "VZ_ontbreekt"
-        temp['koppeling'] = "LN"
-        overview = overview.append(temp, sort=False)
+    mask = ((nummer34['con_opdrachtid'].notna()) & (nummer34['bpnr'].notna()))
+    temp = nummer34[mask][['ln_id', 'bpnr', 'con_opdrachtid']]
+    temp['koppeling'] = 'LN'
+    overview = overview.append(temp, sort=False)
 
-    # %% intake 34 nieuwbouw
-    temp = cp.nb[~(cp.nb['bpnr'].isin(expand_column(ln.df, 'bpnr')['bpnr'].tolist())) &  # bpnr not in ln
-                 # bpnr in Connect
-                 (cp.nb['bpnr'].isin(connect.df['bpnr'].tolist())) &
-                 # bpnr komt niet al voor in de structuur
-                 (~cp.nb['bpnr'].isin(overview['bpnr'])) &
-                 (cp.nb['bpnr'].notna())
-                 ][['bpnr', 'cp_fase']].drop_duplicates()
-    temp = temp.merge(connect.df, how='left', on='bpnr').drop_duplicates()
-    int34 = temp.\
-        fillna('').\
-        groupby(['bpnr', 'con_opdrachtid', 'status_request', 'status_object', 'status_payment']).\
-        agg({
-            'con_objectid': 'nunique',
-            'cp_fase': 'first',
-        }).\
-        reset_index()
-    if len(int34) > 0:
-        int34 = int34.merge(temp.groupby('con_opdrachtid')['con_objectid'].nunique().reset_index(
-        ).rename(columns={'con_objectid': 'Totaal'}), on='con_opdrachtid', how='left')
-        int34['verhouding'] = int34['con_objectid'] / int34['Totaal']
-        temp = int34.copy()
+    mask = ((nummer34['con_opdrachtid'].isna()) & (nummer34['bpnr'].isna()))
+    temp = nummer34[mask][['ln_id']]
+    temp['koppeling'] = 'LN'
+    overview = overview.append(temp, sort=False)
 
-        temp['categorie'] = "34_nieuwbouw_intake"
-        temp['koppeling'] = "CP > Connect (BPNR)"
+    # Bepaal alle combinaties in categorie 31_hoofdnet
+    mask = ln.df['ln_id'].str.startswith('31')
+    temp = ln.df[mask][['ln_id', 'search_argument', 'search_argument2']].rename(
+        columns={'search_argument': 'con_opdrachtid', 'search_argument2': 'bpnr'})
+    temp['koppeling'] = 'LN'
+    overview = overview.append(temp, sort=False)
 
-        # Afgerekende objecten
-        temp.at[
-            (temp['cp_fase'].str.startswith('104')) &
-            (temp['verhouding'] == 1) &
-            (temp['status_payment'] == 'Afgerekend'),
-            'status'] = 'alle Connect objecten zijn afgerekend, maar bijbehorend bouwplannummer is nog niet aangenomen'
-
-        # Vervallen objecten
-        temp['status'] = ''
-        temp.at[
-            (temp['verhouding'] == 1) &
-            (temp['status_object'] == 'Vervallen'), 'status'] = 'alle Connect objecten zijn vervallen'
-
-        # Te koppelen met inactieve nieuwbouw LN
-        temp_2 = temp.merge(
-            ln.df_nonActive[['bpnr', 'ln_id', 'ln_project_status']], how='inner', on='bpnr')
-        temp_2['koppeling'] = "CP > Connect > LN (BPNR, BPNR)"
-        temp_2['let_op'] = ''
-        temp_2.at[~(temp_2['ln_project_status'] == 'Actief'),
-                  'let_op'] = 'LNnr is niet actief'
-        temp_2.at[~(
-            temp_2['ln_id'].str.startswith('34') |
-            temp_2['ln_id'].str.startswith('35') |
-            temp_2['ln_id'].str.startswith('45')), 'let_op2'] = 'LNnr is geen 34-, 35- of 45-nummer'
-
-        # Wijs LN nummer toe obv Conn ID
-        temp_3 = temp.merge(ln.df_nonActive[[
-                            'con_opdrachtid', 'ln_id', 'ln_project_status']], how='inner', on='con_opdrachtid')
-        temp_3.at[~(temp_3['ln_project_status'] == 'Actief'),
-                  'let_op'] = 'LNnr is niet actief'
-        temp_3['koppeling'] = "CP > Connect > LN (BPNR, ConnID)"
-        temp_3.at[~(
-            temp_3['ln_id'].str.startswith('34') |
-            temp_3['ln_id'].str.startswith('35') |
-            temp_3['ln_id'].str.startswith('45')), 'let_op2'] = 'LNnr is geen 34-, 35- of 45-nummer'
-
-        # Er zijn cases die zowel een BPNR als Conn ID hebben wat gevonden kan worden in de set met inactieve LN nummers: hiervan moeten we alleen de eerste behouden
-        # bepaal de duplicated records en vervang op die plekken de koppeling kolom
-        temp_4 = pd.concat([temp_2, temp_3], sort=False)
-        temp_4.at[temp_4[['bpnr', 'ln_id', 'con_opdrachtid']].duplicated(
-        ), 'koppeling'] = "CP > Connect > LN (BPNR, BPNR en ConnID)"
-        temp_4.drop_duplicates(
-            subset=['bpnr', 'con_opdrachtid', 'ln_id'], inplace=True)
-        temp_4['categorie'] = '34_nieuwbouw'
-
-        # Filter cases die in temp zitten, maar ook in temp_2 of in temp_3 (i.e. cases hebben geen LN nummer maar kunnen dat vinden via ofwel BPNR ofwel Connect)
-        temp = temp[~(temp['con_opdrachtid'].isin(temp_3['con_opdrachtid'].tolist()) | temp['bpnr'].isin(temp_2['bpnr'].tolist()))][[
-            'bpnr', 'con_opdrachtid', 'categorie', 'koppeling']].drop_duplicates()
-
-        overview = overview.append([temp, temp_4], sort=False)
-
-    # %% intake 34 vooraanleg
-    temp = cp.nb[~(cp.nb['bpnr'].isin(overview['bpnr'])) &
-                 (cp.nb['bpnr'].notna()) &
-                 ~(
-        (cp.nb['cp_fase'].str.startswith('46.')) |
-        (cp.nb['cp_fase'].str.startswith('99.')) |
-        (cp.nb['cp_fase'].str.startswith('301.'))
+    # Alles wat overblijft klopt niet omdat het search argument niet klopt
+    temp = list(set(ln.df['ln_id']) - set(overview['ln_id']))
+    mask = (
+        (ln.df['ln_id'].isin(temp)) &
+        ((ln.df['ln_id'].str.startswith('34')) |
+         (ln.df['ln_id'].str.startswith('35')) |
+         (ln.df['ln_id'].str.startswith('45')) |
+         (ln.df['ln_id'].str.startswith('31')))
     )
-    ]
-    if len(temp) > 0:
-        temp.at[:, 'categorie'] = "34_vooraanleg_intake"
-        temp.at[~temp['cp_fase'].str.startswith(
-            '100'), 'let_op'] = "Dit nieuwbouwproject is al bezig volgens CP, maar is niet aan een juist LNnummer gekoppeld."
-        # "Capaciteit in ChangePoint ontbreekt"
-        temp.at[temp['cp_capacity'] == 0, 'status'] = ""
+    temp = ln.df[mask][['ln_id', 'search_argument', 'search_argument2']].rename(
+        columns={'search_argument': 'con_opdrachtid', 'search_argument2': 'bpnr'}
+    )
+    temp['koppeling'] = 'LN'
+    overview = overview.append(temp, sort=False)
+    overview = overview.drop_duplicates(subset=['ln_id', 'bpnr', 'con_opdrachtid'])
 
-        # Te koppelen met inactieve nieuwbouw LN
-        temp_2 = temp.merge(
-            ln.df_nonActive[['bpnr', 'ln_id', 'ln_project_status']], how='inner', on='bpnr')
-        temp_2['koppeling'] = "CP > LN (ConnID)"
-        temp_2['let_op'] = ''
-        temp_2.at[~(temp_2['ln_project_status'] == 'Actief'),
-                  'let_op'] = 'LNnr is niet actief'
-        temp_2.at[~(
-            temp_2['ln_id'].str.startswith('34') |
-            temp_2['ln_id'].str.startswith('35') |
-            temp_2['ln_id'].str.startswith('45')), 'let_op2'] = 'LNnr is geen 34-, 35- of 45-nummer'
-        temp = temp[~temp['bpnr'].isin(temp_2['bpnr'].tolist())]
-        temp = temp[['bpnr', 'categorie', 'status']].drop_duplicates()
-        temp['koppeling'] = "CP"
+    ###################################################################################################################
+    # Combinaties binnen Intake
+    ###################################################################################################################
+    # Intake (vanuit Connect)
+    con_totaal = connect.df[['bpnr', 'con_opdrachtid', 'active_con']]
+    con_totaal = con_totaal[con_totaal['active_con']].drop_duplicates()
 
-        overview = overview.append([temp, temp_2], sort=False)
+    # de connect intakes met BPNR, check hier of de complete combinatie niet al voorkomt.
+    mask = (con_totaal['bpnr'].notna() & con_totaal['con_opdrachtid'].notna())
+    temp = con_totaal[mask].drop_duplicates()
+    mask2 = (overview['bpnr'].notna() & overview['con_opdrachtid'].notna())
+    temp2 = overview[mask2][['bpnr', 'con_opdrachtid']].drop_duplicates()
 
-    # %% LN projecten die niet een 34 of 35 nummer hebben, maar wel gekoppeld zijn aan een bpnr
-    temp = ln.df_non3435[ln.df_non3435['bpnr'] != ''][['ln_id', 'bpnr']]
-    temp = temp[temp['bpnr'].isin(cp.nb['bpnr'].tolist())]
-    if len(temp) > 0:
-        temp.at[:, 'categorie'] = "34_vooraanleg"
-        temp['koppeling'] = "LN"
-        temp = temp.merge(connect.df, on='bpnr', how='left').drop_duplicates(
-            subset=['ln_id', 'bpnr', 'con_opdrachtid'])
-        temp.at[temp['con_opdrachtid'].notna(), 'categorie'] = '34_nieuwbouw'
-        temp.at[temp['con_opdrachtid'].notna(
-        ), 'koppeling'] = 'LN > Connect (BPNR)'
-        temp.at[:, 'let_op'] = 'Dit LN nummer bevat een referentie naar ChangePoint, maar is niet als 34 geregisteerd in LN'
-        overview = overview.append(temp, sort=False)
+    temp = temp2.append(temp, sort=False)
+    temp['duplicated'] = temp.duplicated(subset=['bpnr', 'con_opdrachtid'], keep=False)
+    mask = ((~temp['duplicated']) & temp['active_con'].notna())
+    temp = temp[mask][['bpnr', 'con_opdrachtid']]
+    temp['koppeling'] = 'Con'
+    intake = temp
 
-    # %% LN projecten die niet een 34 of 35 nummer hebben, maar wel gekoppeld zijn aan een connectnummer
-    temp = ln.df_non3435[ln.df_non3435['con_opdrachtid'] !=
-                         ''][['ln_id', 'con_opdrachtid', 'ln_project_status']]
-    temp = expand_column(temp, 'con_opdrachtid')
-    temp = temp.merge(connect.df, on='con_opdrachtid', how='inner')[
-        ['ln_id', 'con_opdrachtid', 'ln_project_status', 'order_type']].drop_duplicates()
-    if len(temp) > 0:
-        temp.at[:, 'categorie'] = "35_aanleg"
-        temp.at[~(temp['ln_project_status'] == 'Actief'),
-                'let_op'] = 'LNnr is niet actief'
-        temp.at[~(
-            temp['ln_id'].str.startswith('34') |
-            temp['ln_id'].str.startswith('35') |
-            temp['ln_id'].str.startswith('45')), 'let_op2'] = 'LNnr is geen 34-, 35- of 45-nummer'
-        # Een Connect Opdracht type 'Verplaatsing' mag een 30-nummer hebben.
-        temp.at[
-            temp['ln_id'].str.startswith('30') & (
-                temp['order_type'] == 'Verplaatsing'),
-            'let_op2'] = ''
-        temp['koppeling'] = "LN > Connect (ConnID)"
-        overview = overview.append(temp, sort=False)
+    # de connect intakes zonder BPNR
+    mask = ((con_totaal['bpnr'].isna()) &
+            (~con_totaal['con_opdrachtid'].isin(overview['con_opdrachtid'].tolist())) &
+            (~con_totaal['con_opdrachtid'].isin(intake['con_opdrachtid'])))
+    temp = con_totaal[mask][['bpnr', 'con_opdrachtid']]
+    temp.drop_duplicates(inplace=True)
+    temp['koppeling'] = 'Con'
+    intake = intake.append(temp, sort=False)
 
-    # %% intake 35 aanleg: geen actief LN gevonden; geen BPNR; wel een connect opdracht
-    int35 = connect.df[(connect.df['bpnr'].isna()) &
-                       ~(connect.df['con_opdrachtid'].isin(
-                           overview['con_opdrachtid'].tolist()))
-                       & connect.df['active_con']
-                       ]
-    int35.at[:, 'categorie'] = "35_aanleg_intake"
+    # de CP intakes
+    cp_totaal = cp.nb[['cp_fase', 'bpnr']]
+    mask = ((cp_totaal['cp_fase'].str.startswith('46.')) |
+            (cp_totaal['cp_fase'].str.startswith('99.')) |
+            (cp_totaal['cp_fase'].str.startswith('301.')))
+    cp_totaal = cp_totaal[~mask]
+    mask = ((cp_totaal['bpnr'].notna()) &
+            (~cp_totaal['bpnr'].isin(intake['bpnr'].tolist())) &
+            (~cp_totaal['bpnr'].isin(overview['bpnr'].tolist())))
+    temp = cp_totaal[mask]
+    temp['koppeling'] = 'CP'
+    temp = temp[['bpnr', 'koppeling']]
+    intake = intake.append(temp, sort=False)
+    intake.drop_duplicates(inplace=True)
 
-    int34 = connect.df[(connect.df['bpnr'].notna()) &
-                       ~(connect.df['con_opdrachtid'].isin(
-                           overview['con_opdrachtid'].tolist()))
-                       & connect.df['active_con']
-                       & ~(connect.df['bpnr'].isin(set(overview['bpnr'])))
-                       ]
-    int34.at[:, 'categorie'] = "34_nieuwbouw_intake"
-    int35 = int35.append(int34, sort=False).fillna('')
-    int35_v = int35.groupby(['con_opdrachtid', 'status_request', 'status_object', 'status_payment']).agg(
-        {'con_objectid': 'nunique', 'date_request': 'first'}).reset_index()
-    int35_v = int35_v.merge(
-        int35.groupby('con_opdrachtid')['con_objectid'].nunique(
-        ).reset_index().rename(columns={'con_objectid': 'Totaal'}),
+    ###################################################################################################################
+    # Intake koppelen met inactieve of non3435 nummers
+    ###################################################################################################################
+    # NonActive en non3435 df voorbereiden
+    # regex voor bpnr en con_opdrachtid
+    regex_bpnr = re.compile(r'(20\d{7})|(71\d{7})')
+    regex_connect = re.compile(r'(100\d{7}|H\d{8})')
+
+    mask = ln.df_nonActive['search_argument'].fillna('').str.match(regex_connect)
+    ln.df_nonActive.at[~mask, 'search_argument'] = np.nan
+    mask = ln.df_non3435['search_argument'].fillna('').str.match(regex_connect)
+    ln.df_non3435.at[~mask, 'search_argument'] = np.nan
+
+    # PROBEER TE KOPPELEN MET EEN INACTIEF LN PROJECT
+    # intake koppelen a.d.v. bpnr
+    temp = intake[intake['bpnr'].notna()]
+    intake_bpnr = temp.merge(ln.df_nonActive[['bpnr', 'ln_id']].drop_duplicates(), on='bpnr', how='left')
+    # intake koppelen a.d.v. connect
+    temp = intake[intake['con_opdrachtid'].notna()]
+    intake_con = temp.merge(
+        ln.df_nonActive[['ln_id', 'con_opdrachtid']].drop_duplicates(),
         on='con_opdrachtid',
         how='left')
-    int35_v['verhouding'] = int35_v['con_objectid']/int35_v['Totaal']
-    temp = int35[['con_opdrachtid', 'bpnr', 'categorie']].drop_duplicates()
-    temp['koppeling'] = "Connect"
+    intake = intake_bpnr.append(intake_con, sort=False)
 
-    # Afgerekende opdrachten
-    temp.at[temp['con_opdrachtid'].isin(
-        int35_v[
-            (int35_v['verhouding'] == 1) &
-            (int35_v['status_payment'] == 'Afgerekend') &
-            (int35_v['status_request'] == 'Gereed')
-        ]['con_opdrachtid'].to_list()),
-        'status'] = 'alle Connect objecten zijn afgerekend en de aanvraag is gereed, maar er is geen LN project bekend'
+    # PROBEER TE KOPPELEN MET EEN NON 35 nummer
+    temp = intake[intake['ln_id'].isna()][['bpnr', 'con_opdrachtid', 'koppeling']]
+    # intake koppelen a.d.v. bpnr
+    temp_bpnr = temp[temp['bpnr'].notna()]
+    intake_bpnr = temp_bpnr.merge(ln.df_non3435[['bpnr', 'ln_id']].drop_duplicates(), on='bpnr', how='left')
+    # intake koppelen a.d.v. connect
+    temp_con = temp[temp['con_opdrachtid'].notna()]
+    intake_con = temp_con.merge(
+        ln.df_non3435[['ln_id', 'con_opdrachtid']].drop_duplicates(),
+        on='con_opdrachtid',
+        how='left')
 
-    # Niet afgesloten opdracht
-    temp.at[temp['con_opdrachtid'].isin(
-        int35_v[
-            (int35_v['verhouding'] == 1) &
-            (int35_v['status_payment'] == 'Afgerekend') &
-            (int35_v['status_request'] != 'Gereed')
-        ]['con_opdrachtid'].to_list()),
-        'status'] = 'alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
+    # samenvoegen
+    intake = intake[intake['ln_id'].notna()]
+    intake = intake.append([intake_bpnr, intake_con], sort=False)
+    intake.drop_duplicates(inplace=True)
 
-    # Vervallen opdracht
-    temp.at[temp['con_opdrachtid'].isin(
-        int35_v[
-            (int35_v['verhouding'] == 1) &
-            (int35_v['status_object'] == 'Vervallen')
-        ]['con_opdrachtid'].to_list()),
-        'status'] = 'alle Connect objecten zijn vervallen'
+    # samenvoegen met het totaal: overview
+    overview = overview.append(intake, sort=False)
 
-    # Hoge vervaloptie voor single opdrachten met een datum lang geleden
-    temp.at[temp['con_opdrachtid'].isin(
-        int35_v[
-            (int35_v['Totaal'] == 1) &
-            (int35_v['status_object'] != 'Vervallen') &
-            (int35_v['status_payment'] != 'Afgerekend') &
-            (int35_v['status_request'] != 'Gereed') &
-            (int35_v['date_request'] < pd.to_datetime(
-                'today') - pd.DateOffset(days=400))
-        ]['con_opdrachtid'].to_list()),
-        'status'] = 'Dit betreft een enkele Connect opdracht die meer dan 400 dagen geleden is aangemeld en nog niet gereed is'
+    ###################################################################################################################
+    # De Combinaties aanvullen met de rest van de gegevens uit de deel systemen
+    ###################################################################################################################
 
-    # Te koppelen met inactieve nieuwbouw LN
-    temp_2 = temp.merge(ln.df_nonActive[[
-                        'con_opdrachtid', 'ln_id', 'ln_project_status']], how='inner', on='con_opdrachtid')
-    temp_2['koppeling'] = "Connect > LN (ConnID)"
-    temp_2['let_op'] = ''
-    temp_2.at[~(temp_2['ln_project_status'] == 'Actief'),
-              'let_op'] = 'LNnr is niet actief'
-    temp_2.at[~(
-        temp_2['ln_id'].str.startswith('34') |
-        temp_2['ln_id'].str.startswith('35') |
-        temp_2['ln_id'].str.startswith('40') |
-        temp_2['ln_id'].str.startswith('45')), 'let_op2'] = \
-        'LNnr is geen 34-, 35-, 40- of 45-nummer'
-    temp = temp[~temp['con_opdrachtid'].isin(
-        temp_2['con_opdrachtid'].tolist())]
-    overview = overview.append([temp, temp_2], sort=False)
+    # overview aanvullen met projectinformatie uit LN
+    df_ln = ln.df[['ln_id', 'main_project', 'type_hierarchy', 'active_ln']]
+    df_ln = df_ln.append(ln.df_non3435[['ln_id', 'main_project', 'type_hierarchy', 'active_ln']], sort=False)
+    df_ln = df_ln.append(ln.df_nonActive[['ln_id', 'main_project', 'type_hierarchy', 'active_ln']], sort=False)
+    overview = overview.merge(df_ln, on='ln_id', how='left')
 
-    # %% Intake 34_nieuwbouw:    con_opdracht heeft bpnr in Connect
-    #                           con_opdracht nog niet gekoppeld en is actief
-    #                           bpnr komt niet voor in LN
-    temp = connect.df[
-        connect.df['bpnr'].notna() &
-        connect.df['active_con'] &
-        ~(connect.df['bpnr'].isin(ln.df_proj['bpnr'])) &
-        ~(connect.df['con_opdrachtid'].isin(
-            overview['con_opdrachtid'].unique()))
-    ][['con_opdrachtid', 'bpnr']].drop_duplicates()
-    temp['categorie'] = '34_nieuwbouw_intake'
-    temp['koppeling'] = 'Connect'
-    overview = overview.append(temp)
+    # Voorbereiding Connect
+    temp = connect.df.fillna('').groupby(['con_opdrachtid', 'status_request', 'status_object', 'status_payment']).agg(
+        {'con_objectid': 'nunique', 'date_request': 'first', 'bpnr': 'first', 'active_con': 'first'}).reset_index()
+    temp_2 = connect.df.groupby('con_opdrachtid')['con_objectid'].count()
+    temp = temp.merge(temp_2, on='con_opdrachtid', how='left')
+    temp['verhouding'] = temp.con_objectid_x / temp.con_objectid_y
+    temp.drop(columns=['con_objectid_x'], inplace=True)
+    temp.rename(columns={'con_objectid_y': 'totaal'}, inplace=True)
 
-    # %% Bepaal welke connectOpdrachtID's dubbele CPnrs hebben
-    multipleCP = connect.df_orig[['con_opdrachtid', 'bpnr']].copy()
-    multipleCP = multipleCP.fillna('ontbreekt')
-    multipleCP = multipleCP.groupby('con_opdrachtid')[
-        'bpnr'].nunique().reset_index()
-    multipleCP = multipleCP[multipleCP['bpnr'] > 1]['con_opdrachtid'].tolist()
-    overview.at[(overview['con_opdrachtid'].isin(multipleCP)),
-                'error'] = 'Deze Connect opdracht valt over meerdere bouwplannummers'
+    # afgerekende connect opdrachten maar de aanvraag is nog niet gereed.
+    mask = ((temp['verhouding'] == 1) &
+            (temp['status_payment'] == 'Afgerekend') &
+            (temp['status_request'] != 'Gereed'))
+    temp.at[mask, 'afgerekend'] = True
+    temp.at[~mask, 'afgerekend'] = False
 
-    # %% Bepaal welke CP orders bestaan
-    overview.at[
-        ((~overview['bpnr'].isin(cp.nb['bpnr'].tolist())) &
-         overview['bpnr'].notna() &
-         (overview['bpnr'] != '')),
-        'cp_nummer'] = 'CP nummer is niet als nieuwbouwproject geregisteerd in CP'
-    overview.at[
-        ((~overview['bpnr'].isin(cp.df['bpnr'].tolist())) &
-         overview['bpnr'].notna() &
-         (overview['bpnr'] != '')),
-        'cp_nummer'
-    ] = 'CP nummer bestaat niet in CP'
+    # Vervallen opdrachten
+    mask = ((temp['verhouding'] == 1) &
+            (temp['status_object'] == 'Vervallen'))
+    temp.at[mask, 'vervallen'] = True
+    temp.at[~mask, 'vervallen'] = False
+    df_con = temp[['con_opdrachtid', 'afgerekend', 'vervallen', 'active_con']]
+    df_con.drop_duplicates(inplace=True)
 
-    # %% Bepaal welke Connect orders bestaan
-    overview.at[~overview['con_opdrachtid'].isin(set(connect.df['con_opdrachtid'].tolist()) | set(
-        [np.nan])), 'con_nummer'] = 'Connect opdracht is niet als actief aanleg project geregisteerd in Connect'
-    overview.at[~overview['con_opdrachtid'].isin(set(connect.df_orig['con_opdrachtid'].tolist(
-    )) | set([np.nan])), 'con_nummer'] = 'Connect opdracht bestaat niet in Connect'
+    # Overview aanvullen met Connect
+    overview = overview.merge(df_con, on='con_opdrachtid', how='left')
 
-    # %% Bepaal welke connectorders in meerdere LNnummers zitten
-    temp = overview.fillna('').groupby('con_opdrachtid').nunique()
-    templist = set(temp[temp['ln_id'] > 1].index.tolist())-set([''])
+    # # Overview aanvullen met CP
+    df_cp = cp.nb[['bpnr', 'cp_fase']]
+    df_cp['dup'] = df_cp['bpnr'].duplicated(keep=False)
+    df_cp['start_fase'] = df_cp['cp_fase'].str.startswith('10')
+    # verwijder de CP aansluitingen die dubbel in de db zitten waarvan er een afgesloten is en de ander open
+    mask = df_cp['dup'] & ~df_cp['start_fase']
+    df_cp = df_cp[~mask][['bpnr', 'cp_fase']]
+    df_cp.drop_duplicates(inplace=True)
+    overview = overview.merge(df_cp, on='bpnr', how='left')
 
-    message = "Dit connectId bevindt zich in meerdere LN projecten"
-    overview.at[overview['con_opdrachtid'].isin(templist), 'meerln'] = message
-    templist = overview[(overview['meerln'] == message) & overview['ln_id'].fillna(
-        '') == '']['con_opdrachtid'].tolist()
-    overview.at[overview['con_opdrachtid'].isin(
-        templist), 'meerln'] = "Dit connectId bevindt zich zowel in een LN project als in intake"
+    # Duplicates eruit halen
+    overview = overview.drop_duplicates(subset=['ln_id', 'bpnr', 'con_opdrachtid'], keep='first')
 
-    # %% Bepaal welke CPnummers in meerdere LNnummers zitten
-    temp = overview.fillna('').groupby('bpnr').nunique()
-    templist = set(temp[temp['ln_id'] > 1].index.tolist())-set([''])
-    message = "Dit CPnummer bevindt zich in meerdere LN projecten"
-    overview.at[overview['bpnr'].isin(templist), 'meercp_ln'] = message
-    templist = overview[(overview['meercp_ln'] == message) & (
-        overview['ln_id'].fillna('') == '')]['bpnr'].unique()
-    overview.at[overview['bpnr'].isin(
-        templist), 'meercp_ln'] = "Dit CPnummer bevindt zich zowel in een LN project als in intake"
+    overview['dup_ln_bpnr'] = overview.duplicated(subset=['ln_id', 'bpnr'], keep=False)
+    mask = ((overview['dup_ln_bpnr']) & (overview['con_opdrachtid'].isna()))
+    overview = overview[~mask]
 
-    # %% Bepaald welke CPnummers gecanceled of afgesloten zijn
+    overview['dup_ln_con'] = overview.duplicated(subset=['ln_id', 'con_opdrachtid'], keep=False)
+    mask = ((overview['dup_ln_con']) & (overview['bpnr'].isna()))
+    overview = overview[~mask]
+
+    overview['dup_bpnr_con'] = overview.duplicated(subset=['bpnr', 'con_opdrachtid'], keep=False)
+    mask = ((overview['dup_bpnr_con']) & (overview['ln_id'].isna()))
+    overview = overview[~mask]
+
+    overview['d_bpnr'] = overview['bpnr'].duplicated(keep=False)
+    overview['d_ln'] = overview['ln_id'].duplicated(keep=False)
+    overview['d_con'] = overview['con_opdrachtid'].duplicated(keep=False)
+
+    mask = ((overview['d_bpnr'] & overview['ln_id'].isna() & overview['con_opdrachtid'].isna()))
+    overview = overview[~mask]
+    mask = ((overview['d_ln'] & overview['bpnr'].isna() & overview['con_opdrachtid'].isna()))
+    overview = overview[~mask]
+    mask = ((overview['d_con'] & overview['ln_id'].isna() & overview['bpnr'].isna()))
+    overview = overview[~mask]
+    overview = overview.drop(columns=['dup_ln_bpnr', 'dup_ln_con', 'dup_bpnr_con', 'd_bpnr', 'd_ln', 'd_con'])
+
+    ###################################################################################################################
+    # Categorisering van de combinaties
+    ###################################################################################################################
+    # 31_hoofdnet
+    mask = overview['ln_id'].fillna('').str.startswith('31')
+    overview.at[mask, 'categorie'] = '31_hoofdnet'
+
+    # 35_enkelvoudig
+    mask = (((overview['ln_id'].fillna('').str.startswith('35')) |
+            (overview['ln_id'].fillna('').str.startswith('45'))) &
+            (overview['type_hierarchy'] == 'Enkelvoudig project'))
+    overview.at[mask, 'categorie'] = '35_enkelvoudig'
+
+    # 35_deel
+    mask = ((overview['ln_id'].fillna('').str.startswith('35')) &
+            (overview['type_hierarchy'] == 'Deelproject'))
+    overview.at[mask, 'categorie'] = '35_deel'
+
+    # 34_vooraanleg
+    mask = ((overview['ln_id'].fillna('').str.startswith('34')) &
+            (overview['con_opdrachtid'].isna()))
+    overview.at[mask, 'categorie'] = '34_vooraanleg'
+
+    # 34_nieuwbouw
+    mask = ((overview['ln_id'].fillna('').str.startswith('34')) &
+            (overview['con_opdrachtid'].notna()))
+    overview.at[mask, 'categorie'] = '34_nieuwbouw'
+
+    # VZ_ontbreekt
+    mask = ((overview['ln_id'].notna()) &
+            (~overview['bpnr'].fillna('').str.match(regex_bpnr)) &
+            (~overview['con_opdrachtid'].fillna('').str.match(regex_connect)))
+    overview.at[mask, 'categorie'] = 'VZ_ontbreekt'
+
+    # 31_intake
+    mask = ((overview['ln_id'].isna()) &
+            (overview['con_opdrachtid'].isna()) &
+            (overview['bpnr'].notna()))
+    overview.at[mask, 'categorie'] = '31_intake'
+
+    # 31_35_intake
+    mask = ((overview['ln_id'].isna()) &
+            (overview['con_opdrachtid'].notna()) &
+            (overview['bpnr'].notna()))
+    overview.at[mask, 'categorie'] = '31_35_intake'
+
+    # 35_intake
+    mask = ((overview['ln_id'].isna()) &
+            (overview['con_opdrachtid'].notna()) &
+            (overview['bpnr'].isna()))
+    overview.at[mask, 'categorie'] = '35_intake'
+
+    # de projecten die niet met een juist nummer beginnen worden onder 35_enkelvoudig ingedeeld
+    mask = overview['categorie'].isna()
+    overview.at[mask, 'categorie'] = '35_enkelvoudig'
+
+    ###################################################################################################################
+    # FOUTMELDINGEN
+    ###################################################################################################################
+
+    # Deze Connect opdracht valt over meerdere bouwplannummers
+    temp = overview.groupby('con_opdrachtid').agg({'bpnr': 'nunique'})
+    temp = list(temp[temp['bpnr'] > 1].index.unique())
+    mask = overview['con_opdrachtid'].isin(temp)
+    overview.at[mask, 'F01'] = 'F01_Deze Connect opdracht valt over meerdere bouwplannummers'
+
+    # Dit connectid bevindt zich in meerdere LN projecten
+    temp = overview.groupby('con_opdrachtid').agg({'ln_id': 'nunique'})
+    temp = list(temp[temp['ln_id'] > 1].index.unique())
+    mask = overview['con_opdrachtid'].isin(temp)
+    overview.at[mask, 'F02'] = 'F02_Dit connectid bevindt zich in meerdere LN projecten'
+
+    # Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed
+    mask = (overview['afgerekend'].fillna(False))
+    overview.at[mask, 'F03'] = 'F03_Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
+
+    # in Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als 35-nummer
+    mask = ((overview['ln_id'].fillna('').str.startswith('35')) &
+            (overview['bpnr'].notna()) &
+            (overview['type_hierarchy'] == 'Enkelvoudig project'))
+    overview.at[mask, 'F04'] = 'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
+
+    # LNnr is niet actief
+    mask = ((~overview['active_ln'].fillna(True)) | (overview['ln_id'].isin(list(ln.df_nonActive['ln_id'].unique()))))
+    overview.at[mask, 'F05'] = 'F05_LNnr is niet actief'
+
+    # CP nummer is niet als nieuwbouwproject geregistreerd in CP
+    cp_nb_nummers = list(cp.nb['bpnr'].unique())
+    mask = ((overview['bpnr'].notna()) & (~overview['bpnr'].isin(cp_nb_nummers)) & (overview['bpnr'] != ''))
+    overview.at[mask, 'F06'] = 'F06_CP nummer is niet als nieuwbouwproject geregistreerd in CP'
+
+    # Connect opdracht is niet als actief aanleg project geregistreerd in Connect
+    connect_nummers = list(connect.df['con_opdrachtid'].unique())
+    mask = ((overview['con_opdrachtid'].notna()) &
+            (~overview['con_opdrachtid'].isin(connect_nummers)) &
+            (overview['con_opdrachtid'] != ''))
+    overview.at[mask, 'C07'] = 'C07_Connect opdracht is niet als actief aanleg project geregistreerd in Connect'
+
+    # Connect order is niet meer actief
+    mask = (~(overview['active_con'].fillna(True)))
+    overview.at[mask, 'F08'] = 'F08_Connect opdracht is niet actief'
+
+    # Dit CPnummer bevindt zich in meerdere LN projecten (alleen voor 31 nummers of 34 nummers)
+    mask = ((overview['ln_id'].fillna('').str.startswith('31')) | overview['ln_id'].fillna('').str.startswith('34'))
+    temp = overview[mask]
+    temp = temp.groupby('bpnr').agg({'ln_id': 'nunique'})
+    temp = list(temp[temp['ln_id'] > 1].index.unique())
+    mask = overview['bpnr'].isin(temp)
+    overview.at[mask, 'F09'] = 'F09_Dit CPnummer bevindt zich in meerdere LN (hoofd)projecten'
+
+    # Dit CP nummer is afgesloten of gecanceld
     afgesloten = cp.df[cp.df['cp_fase'].str.lower(
     ).str.contains('project completed')]
-    cancel = cp.df[cp.df['cp_fase'].str.lower().str.contains('cancel')]
-    overview['cp_closed'] = ''
     overview.at[overview['bpnr'].isin(afgesloten['bpnr'].tolist()) &
-                overview['bpnr'].notna(), 'cp_closed'] = "Dit CPnummer is afgesloten"
+                overview['bpnr'].notna(), 'C10'] = "C10_Dit CPnummer is afgesloten"
+
+    # Dit LN nummer is geen 31, 35, 45 of 34 nummer
+    mask = (~(overview['ln_id'].fillna('').str.startswith('34') |
+            overview['ln_id'].fillna('').str.startswith('31') |
+            overview['ln_id'].fillna('').str.startswith('35') |
+            overview['ln_id'].fillna('').str.startswith('45')) &
+            overview['ln_id'].notna())
+    overview.at[mask, 'C11'] = 'C11_LNnr is geen 31-, 34-, 35- of 45-nummer'
+
+    # LN: hoofd/deelproject zonder zoekreferentie II (bouwplan)
+    mask = (((ln.df['type_hierarchy'] == 'Hoofdproject') | (ln.df['type_hierarchy'] == 'Deelproject')) &
+            (ln.df['search_argument2'].isna()) | (ln.df['search_argument2'] == ''))
+    missing_searchargument = list(ln.df[mask]['ln_id'].unique())
+    mask = overview['ln_id'].isin(missing_searchargument)
+    overview.at[mask, 'F12'] = 'F12_LN: hoofd/deelproject zonder zoekreferentie II (bouwplan)'
+
+    # LN: enkel/deelproject zonder zoekreferentie I (connect)
+    mask = (((ln.df['type_hierarchy'] == 'Enkelvoudig project') | (ln.df['type_hierarchy'] == 'Deelproject')) &
+            (ln.df['search_argument'].isna()) | (ln.df['search_argument'] == ''))
+    missing_searchargument = list(ln.df[mask]['ln_id'].unique())
+    mask = overview['ln_id'].isin(missing_searchargument)
+    overview.at[mask, 'F13'] = 'F13_LN: enkel/deelproject zonder zoekreferentie I (connect)'
+
+    # LN: enkelvoudig project met zoekreferentie II (bouwplan)
+    mask = ((ln.df['type_hierarchy'] == 'Enkelvoudig project') &
+            ((ln.df['search_argument2'].notna()) & (ln.df['search_argument2'] != '')))
+    missing_searchargument = list(ln.df[mask]['ln_id'].unique())
+    mask = overview['ln_id'].isin(missing_searchargument)
+    overview.at[mask, 'F14'] = 'F14_LN: enkelvoudig project met zoekreferentie II (bpnr)'
+
+    # Hoofdproject en deelproject hebben een ander bouwplannummer
+    mask = overview['ln_id'].fillna('').str.startswith('31')
+    temp = overview[mask][['ln_id', 'bpnr']].rename(columns={'ln_id': 'ln_id_hoofdproject', 'bpnr': 'bpnr_hoofdproject'})
+    temp = overview[overview['main_project'].notna()].merge(temp, left_on='main_project', right_on='ln_id_hoofdproject', how='left')
+    mask = temp['bpnr'] != temp['bpnr_hoofdproject']
+    temp = list(temp[mask]['ln_id'].unique())
+    mask = overview['ln_id'].isin(temp)
+    overview.at[mask, 'F15'] = 'F15_Hoofdproject en deelproject hebben een ander bouwplannummer'
+    # zelfde foutmelding toevoegen aan de 31 projecten waar dit voor geld.
+    mask = overview['F15'].notna()
+    nummbers31 = overview[mask]['main_project'].unique()
+    mask = (overview['ln_id'].notna() & overview['ln_id'].isin(nummbers31))
+    overview.at[mask, 'F15'] = 'F15_Hoofdproject en deelproject hebben een ander bouwplannummer'
+
+    # Connect opdracht bestaat niet in Connect
+    connect_nummers = list(connect.df_orig['con_opdrachtid'].unique())
+    mask = ((overview['con_opdrachtid'].notna()) &
+            (~overview['con_opdrachtid'].isin(connect_nummers)) &
+            (overview['con_opdrachtid'] != ''))
+    overview.at[mask, 'F16'] = 'F16_Connect opdracht bestaat niet in Connect'
+    # op de plek waar de connect niet bestaat, is deze ook geen nieuwbouw project. Dus op die plaatsen weghalen
+    mask = overview['F16'].notna()
+    overview.at[mask, 'C07'] = np.nan
+
+    # Dit CP nummer bestaat niet in CP
+    cp_nummers = list(cp.df['bpnr'].unique())
+    mask = ((overview['bpnr'].notna()) & (~overview['bpnr'].isin(cp_nummers)) & (overview['bpnr'] != ''))
+    overview.at[mask, 'F17'] = 'F17_CP nummer bestaat niet in CP'
+    # op de plek waar de bpnr niet bestaat, is deze ook geen nieuwbou project. Dus op die plaatsen weghalen
+    mask = overview['F17'].notna()
+    overview.at[mask, 'F06'] = np.nan
+
+    # Dit CP nummer is afgesloten of gecanceld
+    cancel = cp.df[cp.df['cp_fase'].str.lower().str.contains('cancel')]
     overview.at[overview['bpnr'].isin(cancel['bpnr'].tolist()) &
-                overview['bpnr'].notna(), 'cp_closed'] = "Dit CPnummer is gecanceled"
+                overview['bpnr'].notna(), 'C18'] = "C18_Dit CPnummer is gecanceled"
 
-    # %% Bijzondere regels:
-    # Wel LNnummers gevonden, maar niet binnen de juiste categorie:
-    notintake = ((overview['categorie'].str.endswith('_intake')) &
-                 (overview['ln_id'].notna()))
-    overview.at[notintake,
-                'categorie'] = overview[notintake]['categorie'].str[:-7]
 
-    # Als alles in connect is afgerekend en in een afgesloten LN project heeft:
-    afgesloten = (overview['status'].str.contains('alle Connect objecten zijn afgerekend en de aanvraag is gereed, maar er is geen LN project bekend')) & \
-        (overview['let_op'].str.contains('LNnr is niet actief')) & \
-        ((overview['bpnr'].isna()) | (overview['cp_nummer'] == 'CP nummer bestaat niet in CP') |
-         (overview['cp_closed'] != ''))
-    afgesloten = afgesloten | (
-        (overview['status'].str.contains('alle Connect objecten zijn afgerekend en de aanvraag is gereed, maar er is geen LN project bekend')) |
-        ((overview['status'].str.contains(
-            'alle Connect objecten zijn vervallen')) & overview['ln_id'].isna())
-    )
-    afgesloten = afgesloten | \
-        (overview['let_op'].str.contains('LNnr is niet actief')) & \
-        ((overview['cp_nummer'] == 'CP nummer bestaat niet in CP') |
-         (overview['cp_closed'] != ''))
-    temp = overview[afgesloten].copy()
-    temp['categorie'] = temp['categorie'].str[:3] + 'afgesloten'
-    overview = overview[~afgesloten]
-    overview = overview.append(temp, sort=False)
+    ###################################################################################################################
+    # Verwijder afgesloten projecten
+    ###################################################################################################################
+    # LN, CP en CON zijn afgesloten
+    mask = (overview['bpnr'].notna() & overview['con_opdrachtid'].notna() & overview['ln_id'].notna() &
+            (overview['C10'].notna() | overview['C18'].notna()) & overview['F08'].notna() & overview['F05'].notna())
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # Geen LN, maar CP en CON zijn afgesloten
+    mask = (overview['bpnr'].notna() & overview['con_opdrachtid'].notna() & overview['ln_id'].isna() &
+            (overview['C10'].notna() | overview['C18'].notna()) & overview['F08'].notna())
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # Geen CP, maar LN en CON zijn afgesloten
+    mask = (overview['bpnr'].isna() & overview['con_opdrachtid'].notna() & overview['ln_id'].notna() &
+            overview['F08'].notna() & overview['F05'].notna())
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # Geen CON, maar LN en CP zijn afgesloten
+    mask = (overview['bpnr'].notna() & overview['con_opdrachtid'].isna() & overview['ln_id'].notna() &
+            (overview['C10'].notna() | overview['C18'].notna()) & overview['F05'].notna())
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # Alleen CP maar afgesloten
+    mask = (overview['bpnr'].notna() & overview['con_opdrachtid'].isna() & overview['ln_id'].isna() &
+            (overview['C10'].notna() | overview['C18'].notna()))
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # Alleen Connect maar afgesloten
+    mask = (overview['bpnr'].isna() & overview['con_opdrachtid'].notna() & overview['ln_id'].isna() &
+            overview['F08'].notna())
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # Alleen LN maar afgesloten
+    mask = (overview['bpnr'].isna() & overview['con_opdrachtid'].isna() & overview['ln_id'].notna() &
+            overview['F05'].notna())
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
 
-    # %% reformat
-    overview = merge_columns_text(overview, ['error', 'let_op', 'let_op2', 'meerln', 'meercp_ln',
-                                             'status', 'cp_nummer', 'con_nummer', 'cp_closed'], 'Projectstructuur constateringen')
-    overview.at[overview['categorie'].str.contains(
-        'afgesloten'), 'Projectstructuur constateringen'] = ''
+    # Als de combinatie in VZ_ontbreekt beland, en het zoekargument (Connect) bevat 'ALG', 'Alg', 'alg', dan afgesloten
+    mask = ((overview['categorie'] == 'VZ_ontbreekt') &
+            ((overview['con_opdrachtid'].fillna('').str.contains('Alg')) |
+             (overview['con_opdrachtid'].fillna('').str.contains('ALG')) |
+             (overview['con_opdrachtid'].fillna('').str.contains('alg'))))
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    mask = overview['afgesloten'].isna()
+    overview.at[mask, 'afgesloten'] = ''
 
-    # %% DETERMINE CAPACITY
-    determine_capacity = False
-    if determine_capacity:
-        capacity = overview[['bpnr', 'ln_id', 'con_opdrachtid',
-                             'cp_nummer', 'con_nummer', 'categorie']].copy()
-        capacity = capacity[
-            (capacity['categorie'].str[:2].isin(['34', '35'])) &
-            (capacity['cp_nummer'].isna()) &
-            (capacity['con_nummer'].isna())
-        ]
+    # verwijder afgesloten projecten
+    overview = overview[overview['afgesloten'] == '']
 
-        for i, row in capacity.iterrows():
-            if len(cp.df[cp.df['bpnr'] == row['bpnr']]) > 0:
-                capacity.at[i, 'cp'] = cp.df[cp.df['bpnr']
-                                             == row['bpnr']]['capaciteit'].values[0]
-            if row['con_opdrachtid'] != np.nan:
-                con_temp = connect.df[connect.df['con_opdrachtid']
-                                      == row['con_opdrachtid']]
-                capacity.at[i, 'connect_orig'] = con_temp['con_objectid'].count()
-                capacity.at[i, 'connect_now'] = con_temp[
-                    (con_temp['status_object'] != 'Vervallen') &
-                    (con_temp['Afzegreden'].isna())
-                ]['con_objectid'].count()
-            if row['ln_id'] != np.nan:
-                capacity.at[i, 'inforln'] = ln.df_proj[ln.df_proj['ln_id']
-                                                       == row['ln_id']]['Aantal_aansluitingen'].sum()
 
-        capacity[['bpnr', 'ln_id', 'con_opdrachtid']] = capacity[[
-            'bpnr', 'ln_id', 'con_opdrachtid']].fillna('')
+    ###################################################################################################################
+    # Verwijder foutmeldingen die bij een bepaalde categorie niet voor hoeven komen.
+    ###################################################################################################################
 
-        # %% Bepaal filters capaciteit
-        cap_34_nb = capacity['categorie'].str.contains('nieuwbouw')
-        cap_35 = (capacity['categorie'].str.startswith('35')) & ~(
-            capacity['categorie'].str.contains('intake'))
-        cap_34_va = capacity['categorie'].str.contains('vooraanleg')
-        cap_cp2con = (capacity.cp.between(capacity['connect_now'], capacity['connect_orig'])) | \
-            (capacity.cp.between(
-                capacity['connect_orig'], capacity['connect_now']))
-        cap_ln2con = (capacity.inforln.between(capacity['connect_now'], capacity['connect_orig'])) | \
-            (capacity.inforln.between(
-                capacity['connect_orig'], capacity['connect_now']))
-        cap_ln2cp = (capacity.inforln == capacity.cp)
+    # 'F01' = 'F01_Deze Connect opdracht valt over meerdere bouwplannummers'
+    # 'F02' = 'F02_Dit connectid bevindt zich in meerdere LN projecten'
+    # 'F03' = 'F03_Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
+    # 'F04' = 'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
+    # 'F05' = 'F05_LNnr is niet actief'
+    # 'F06' = 'F06_CP nummer is niet als nieuwbouwproject geregistreerd in CP'
+    # 'C07' = 'C07_Connect opdracht is niet als actief aanleg project geregistreerd in Connect'
+    # 'F08' = 'F08_Connect opdracht is niet actief'
+    # 'F09' = 'F09_Dit CPnummer bevindt zich in meerdere LN (hoofd)projecten'
+    # 'C10' = 'C10_Dit CPnummer is afgesloten'
+    # 'C11' = 'C11_LNnr is geen 31-, 34-, 35- of 45-nummer'
+    # 'F12' = 'F12_LN: hoofd/deelproject zonder zoekreferentie II (bouwplan)'
+    # 'F13' = 'F13_LN: enkel/deelproject zonder zoekreferentie I (connect)'
+    # 'F14' = 'F14_LN: enkelvoudig project met zoekreferentie II (bpnr)'
+    # 'F15' = 'F15_Hoofdproject en deelproject hebben een ander bouwplannummer'
+    # 'F16' = 'F16_Connect opdracht bestaat niet in Connect'
+    # 'F17' = 'F17_CP nummer bestaat niet in CP'
+    # 'C18' = 'C18_Dit CPnummer is gecanceled'
 
-        # %% Capacity Nieuwbouw
-        capacity_nb = capacity[cap_34_nb].groupby(['ln_id', 'bpnr', 'categorie']).agg({
-            'cp': 'first', 'inforln': 'first', 'connect_orig': 'sum', 'connect_now': 'sum'
-        })
+    # FOUTEN
+    mapping_fouten_categorie = {
+        '34_nieuwbouw': ['F01', 'F02', 'F03', 'F05', 'F06', 'F08', 'F09', 'C10', 'F17', 'C18'],
+        '34_vooraanleg': ['F05', 'F06', 'F09', 'C10', 'F17', 'C18'],
+        '31_hoofdnet': ['F05', 'F06', 'F09', 'C10', 'F12', 'F15', 'F17', 'C18'],
+        '35_deel': ['F01', 'F02', 'F03', 'F05', 'F06', 'C07', 'F08',
+                    'C10', 'C11', 'F12', 'F13',  'F15', 'F16', 'F17', 'C18'],
+        '35_enkelvoudig': ['F01', 'F02', 'F03', 'F04', 'F05', 'C07',
+                           'F08', 'C11', 'F13', 'F14', 'F16'],
+        '31_35_intake': ['F01', 'F02', 'F03', 'F06', 'F08', 'C10', 'F17', 'C18'],
+        '35_intake': ['F01', 'F03', 'F08'],
+        '31_intake': [],
+        'VZ_ontbreekt': []
+    }
 
-        cap_cp2con = (capacity_nb.cp.between(capacity_nb['connect_now'], capacity_nb['connect_orig'])) | \
-            (capacity_nb.cp.between(
-                capacity_nb['connect_orig'], capacity_nb['connect_now']))
-        cap_ln2con = (capacity_nb.inforln.between(capacity_nb['connect_now'], capacity_nb['connect_orig'])) | \
-            (capacity_nb.inforln.between(
-                capacity_nb['connect_orig'], capacity_nb['connect_now']))
-        cap_ln2cp = (capacity_nb.inforln == capacity_nb.cp)
+    foutmeldingen = pd.DataFrame([])
+    for cat in mapping_fouten_categorie.keys():
+        temp = overview[overview['categorie'] == cat]
+        temp = merge_columns_text(temp, mapping_fouten_categorie[cat], 'Projectstructuur constateringen')
+        foutmeldingen = foutmeldingen.append(temp, sort=False)
+    overview = foutmeldingen
+    overview.at[overview['Projectstructuur constateringen'] == '', 'Projectstructuur constateringen'] = np.nan
 
-        capacity_nb.at[
-            :, 'cap'] = 'capaciteit in een of meerdere systemen nul'
+    ###################################################################################################################
+    # Merge foutmeldingen en bereid het df voor
+    ###################################################################################################################
+    overview = overview[['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling']]
+    mask = overview['Projectstructuur constateringen'].fillna('').str.startswith(';')
+    overview.at[mask, 'Projectstructuur constateringen'] = overview[mask]['Projectstructuur constateringen'].str[2:]
 
-        capacity_nb.at[
-            (capacity_nb['connect_orig'] > 0) &
-            (capacity_nb['inforln'] > 0) &
-            (capacity_nb['cp'] > 0), 'cap'] = 'capaciteit overal ingevuld, maar niet gelijk'
-
-        capacity_nb.at[cap_cp2con & cap_ln2con,
-                       'cap'] = 'de capaciteit in LN en CP vallen beide tussen het aantal initiele aanvragen in Connect en het aantal huidige aanvragen in Connect'
-
-        capacity_nb.at[
-            (capacity_nb['connect_now'] == capacity_nb['cp']) &
-            (capacity_nb['connect_now'] == capacity_nb['inforln']), 'cap'] = 'de capaciteit in LN en CP komt overeen met het aantal huidige openstaande objecten in Connect'
-
-        capacity_nb.at[
-            (capacity_nb['connect_orig'] == capacity_nb['cp']) &
-            (capacity_nb['connect_orig'] == capacity_nb['inforln']),
-            'cap'] = 'de capaciteit in LN en CP komt overeen met het initiele aantal objecten in Connect'
-
-        capacity_nb = capacity_nb.reset_index()
-        capacity_nb = capacity[cap_34_nb].merge(capacity_nb[['ln_id', 'bpnr', 'categorie', 'cap']], on=[
-                                                'ln_id', 'bpnr', 'categorie'], how='left')
-
-        # %% Capacity Vooraanleg
-        cap_cp2con = (capacity.cp.between(capacity['connect_now'], capacity['connect_orig'])) | \
-            (capacity.cp.between(
-                capacity['connect_orig'], capacity['connect_now']))
-        cap_ln2con = (capacity.inforln.between(capacity['connect_now'], capacity['connect_orig'])) | \
-            (capacity.inforln.between(
-                capacity['connect_orig'], capacity['connect_now']))
-        cap_ln2cp = (capacity.inforln == capacity.cp)
-
-        capacity.at[cap_34_va &
-                    ((capacity['cp'] == 0) |
-                     (capacity['inforln'] == 0)), 'cap'] = 'capaciteit in een of meer systemen gelijk aan nul'
-
-        capacity.at[cap_34_va &
-                    (capacity['cp'] > 0) &
-                    (capacity['inforln'] > 0), 'cap'] = 'de capaciteiten zijn niet gelijk'
-
-        capacity.at[cap_34_va & cap_ln2cp,
-                    'cap'] = 'de capaciteit in LN komt overeen met de capaciteit in CP'
-
-        # %% Capacity Aanleg
-        capacity.at[cap_35 &
-                    ((capacity['connect_orig'] == 0) |
-                     (capacity['inforln'] == 0)), 'cap'] = 'capaciteit in een of meer systemen gelijk aan nul'
-
-        capacity.at[cap_35 &
-                    ((capacity['connect_orig'] > 0) &
-                     (capacity['inforln'] > 0)), 'cap'] = 'de capaciteiten zijn niet gelijk'
-
-        capacity.at[cap_35 & cap_ln2con,
-                    'cap'] = 'de capaciteit in LN valt tussen het aantal initiele aanvragen in Connect en het aantal huidige aanvragen in Connect'
-
-        capacity.at[cap_35 & (capacity['connect_now'] == capacity['inforln']),
-                    'cap'] = 'de capaciteit in LN komt overeen met het aantal huidige openstaande objecten in Connect'
-
-        capacity.at[cap_35 &
-                    (capacity['connect_orig'] == capacity.inforln),
-                    'cap'] = 'de capaciteit in LN komt overeen met het initiele aantal objecten in Connect'
-
-        # %% Combineer nieuwbouw en de rest
-        capacity = capacity[~cap_34_nb].append(capacity_nb, sort=False)
-
-        # %% Complete list and append
-        overview[['bpnr', 'ln_id', 'con_opdrachtid']] = overview[[
-            'bpnr', 'ln_id', 'con_opdrachtid']].fillna('')
-        overview = overview.merge(capacity[['bpnr', 'ln_id', 'con_opdrachtid', 'cap', 'inforln', 'connect_orig', 'connect_now', 'cp']], how='left', on=[
-                                  'bpnr', 'ln_id', 'con_opdrachtid']).rename(columns={'cap': 'capaciteit'})
+    # intake aanvullen met aanvraagdatum cp en connect
+    intake = overview[overview['categorie'].str.contains('intake')][[
+        'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen']]
+    intake = intake.merge(connect.df_orig[['con_opdrachtid', 'date_request']].drop_duplicates(
+        subset='con_opdrachtid'), on='con_opdrachtid', how='left')
+    intake = intake.merge(cp.df[['bpnr', 'date_created']].drop_duplicates(
+        subset='bpnr'), on='bpnr', how='left')
+    intake = intake.rename(columns={
+        'date_request': 'Aanvraagdatum Connect',
+        'date_created': 'Aanvraagdatum CP',
+    })
+    intake['Aanvraagdatum Connect'] = intake['Aanvraagdatum Connect'].fillna(
+        '').astype(str).str.split(' ', expand=True)[0]
+    intake['Aanvraagdatum CP'] = intake['Aanvraagdatum CP'].fillna(
+        '').astype(str).str.split(' ', expand=True)[0]
 
     # %% Save list
-    to_export = ['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling'
-                 ]
+    to_export = ['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling']
 
-    if determine_capacity:
-        to_export = to_export + ['capaciteit',
-                                 'inforln', 'connect_orig', 'connect_now', 'cp']
-
-    exportexcel = False
-    if exportexcel:
-        overview_export = overview[to_export].rename(columns={
-            'ln_id': 'LN nummer',
-            'bpnr': 'CP nummer',
-            'con_opdrachtid': 'Connect Opdracht ID',
-            'inforln': 'Capaciteit LN',
-            'connect_orig': 'Capaciteit Connect (origineel)',
-            'connect_now': 'Capaciteit Connect (nu)',
-            'cp': 'Capaciteit CP'
-        })
-
-        # Schrijf naar Excel
-        overview_export.to_excel('overview.xlsx', index=False)
-
-    # #%% Get list of actions
-    # a = [el for el in overview['Projectstructuur constateringen'].str.split('; ').tolist() if isinstance(el,list)]
-    # b = []
-    # for el in a:
-    #     for ell in el:
-    #         b.append(ell)
-    # b = set(b)
-    # print(b)
-
-    # %% doe de checks
     if check_sets:
         print('LN: too many in list; set(list) - set(ln) = {}\nLN: missing in set; set(ln) - set(list) = {}'.format(
             set(overview['ln_id'].tolist()) -
@@ -1061,81 +1066,4 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             )) - sets['con_opdrachtid'], sets['con_opdrachtid'] - set(overview['con_opdrachtid'].tolist())
         ))
 
-    intake = overview[overview['categorie'].str.contains('intake')][[
-        'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen']]
-    intake = intake.merge(connect.df_orig[['con_opdrachtid', 'date_request']].drop_duplicates(
-        subset='con_opdrachtid'), on='con_opdrachtid', how='left')
-    intake = intake.merge(cp.df[['bpnr', 'date_created']].drop_duplicates(
-        subset='bpnr'), on='bpnr', how='left')
-    intake = intake.rename(columns={
-        'date_request': 'Aanvraagdatum Connect',
-        'date_created': 'Aanvraagdatum CP',
-    })
-    intake['Aanvraagdatum Connect'] = intake['Aanvraagdatum Connect'].fillna(
-        '').astype(str).str.split(' ', expand=True)[0]
-    intake['Aanvraagdatum CP'] = intake['Aanvraagdatum CP'].fillna(
-        '').astype(str).str.split(' ', expand=True)[0]
-
-    # %% Xaris koppeling
-    # xaris = xaris_()
-    # overview, relevante_xaris = xaris.toevoegen_xaris_foutmeldingen(connect, overview)
-    # overview = overview.reset_index()
-    # to_export = ['ln_id'
-    #             ,'bpnr'
-    #             ,'con_opdrachtid'
-    #             ,'Xaris'
-    #             ,'categorie'
-    #             ,'Projectstructuur constateringen'
-    #             ,'koppeling'
-    #             ]
-
-    ## split 'LNnr niet actief' --> CP nog open, Connect nog open, Cp en Connect nog open
-    cp_fases_closed = ['46. Cancel', '99. Project Completed', '301. Voortijdig Afsluiten']
-    overview['cp_is_afgesloten'] = overview['cp_fase'].isin(cp_fases_closed)
-    overview['connect_is_afgesloten'] = overview['verhouding'] == 1
-    
-    # categorie 34_vooraanleg --> LNnr is niet actief, CP nog open
-    mask = (
-        (overview['let_op'] == 'LNnr is niet actief') &
-        (overview['categorie'] == '34_vooraanleg')
-    )
-    overview.at[mask, 'Projectstructuur constateringen'] = overview[mask]['Projectstructuur constateringen'].\
-        str.replace('LNnr is niet actief', 'LNnr is niet actief, CP nog open')
-    # categorie 35_aanleg en 35_afgesloten --> LNnr is niet actief, Connect nog open
-    mask = (
-        (overview['let_op'] == 'LNnr is niet actief') &
-        (overview['categorie'].isin(['35_aanleg', '35_afgesloten']))
-    )
-    overview.at[mask, 'Projectstructuur constateringen'] = overview[mask]['Projectstructuur constateringen'].\
-        str.replace('LNnr is niet actief', 'LNnr is niet actief, Connect nog open')   
-    
-    # categorie 34_nieuwbouw en 34_afgesloten: Check welke nog open is
-    # alleen CP nog open
-    mask = (
-        (overview['let_op'] == 'LNnr is niet actief') &
-        (overview['categorie'].isin(['34_nieuwbouw', '34_afgesloten'])) &
-        (~overview['cp_is_afgesloten']) &
-        (overview['connect_is_afgesloten'])
-    )
-    overview.at[mask, 'Projectstructuur constateringen'] = overview[mask]['Projectstructuur constateringen'].\
-        str.replace('LNnr is niet actief', 'LNnr is niet actief, CP nog open')
-    # alleen Connect nog open
-    mask = (
-        (overview['let_op'] == 'LNnr is niet actief') &
-        (overview['categorie'].isin(['34_nieuwbouw', '34_afgesloten'])) &
-        (overview['cp_is_afgesloten']) &
-        (~overview['connect_is_afgesloten'])
-    )
-    overview.at[mask, 'Projectstructuur constateringen'] = overview[mask]['Projectstructuur constateringen'].\
-        str.replace('LNnr is niet actief', 'LNnr is niet actief, Connect nog open')
-    # Beide nog open 
-    mask = (
-        (overview['let_op'] == 'LNnr is niet actief') &
-        (overview['categorie'].isin(['34_nieuwbouw', '34_afgesloten'])) &
-        (~overview['cp_is_afgesloten']) &
-        (~overview['connect_is_afgesloten'])
-    )
-    overview.at[mask, 'Projectstructuur constateringen'] = overview[mask]['Projectstructuur constateringen'].\
-        str.replace('LNnr is niet actief', 'LNnr is niet actief, CP en Connect nog open')
-
-    return overview[to_export], intake  # , relevante_xaris
+    return overview[to_export], intake
