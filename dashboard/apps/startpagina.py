@@ -321,7 +321,7 @@ def update_data_dashboard():
             overview['observation_count'] = 0
             for obs in observation_messages:
                 mask = (overview['Projectstructuur constateringen'].str.contains(obs).fillna(False))
-                overview.at[mask, 'observation_count'] = overview.at[mask, 'observation_count'] + 1
+                overview.at[mask, 'observation_count'] += 1
 
             message = 'Data has been succesfully reloaded'
             color = 'success'
