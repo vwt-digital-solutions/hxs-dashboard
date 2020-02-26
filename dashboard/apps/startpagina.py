@@ -318,7 +318,7 @@ def update_data_dashboard():
                 print(text6)
                 update_czCleaning(overview.fillna(''), session=session)
 
-            overview['observation_count'] = 0 
+            overview['observation_count'] = 0
             for obs in observation_messages:
                 mask = (overview['Projectstructuur constateringen'].str.contains(obs).fillna(False))
                 overview.at[mask, 'observation_count'] = overview[mask]['observation_count'] + 1
