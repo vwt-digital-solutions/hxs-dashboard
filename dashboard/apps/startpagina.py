@@ -45,12 +45,9 @@ observation_messages = [
 def get_body():
     jumbotron = html.Div(
         [
-            dbc.Row(
-                id='alert_reload',
-                style={
-                    'margin-left': '3%',
-                    'margin-right': '3%',
-                },
+            dbc.Collapse(
+                id="collapse",
+                is_open=False,
             ),
             html.Div(
                 html.Img(src=app.get_asset_url(config.image),
@@ -137,7 +134,7 @@ def update_cleanheid_tabel():
         q = sa.select([czLog.description, czLog.created]).\
             where(czLog.action == 'reload_end')
     df = pd.read_sql(q, session.bind, coerce_float=False)
-    
+
     mask = ((df['description'] != 'failure') & (df['description'].str.count(':') ==3))
     df.at[mask, 'description'] = df['description'] + '| _notes:0'
 
@@ -364,25 +361,20 @@ def update_data_dashboard():
         message = 'Data is being reloaded at the moment'
         color = 'warning'
 
-    return [
-        dbc.Alert(
-            message,
-            is_open=True,
-            color=color,
-            dismissable=True
-        ),
-    ]
+    return message, color
 
 
 # Callback reload_button
 @app.callback(
     [
-        Output('alert_reload', 'children'),
+        Output('collapse', 'children'),
+        Output('collapse', 'is_open')
     ],
     [
         Input('reload_button', 'n_clicks_timestamp'),
     ],
 )
 def reload_data(reload_button):
-    reloaded = update_data_dashboard()
-    return reloaded
+    message, color = update_data_dashboard()
+    card = [dbc.Card(dbc.CardBody(message, style={'color': color}))]
+    return card, True
