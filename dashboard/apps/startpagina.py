@@ -33,7 +33,9 @@ dropdown2 = 'dropdown_cp'
 dropdown3 = 'dropdown1_con'
 
 observation_messages = [
+    'C03',
     'C07',
+    'C08',
     'C10',
     'C11',
     'C18',
