@@ -32,13 +32,11 @@ dropdown1 = 'dropdown_ln'
 dropdown2 = 'dropdown_cp'
 dropdown3 = 'dropdown1_con'
 
-observation_messages=[
-    'Dit betreft een enkele Connect opdracht die meer dan 400 dagen geleden is aangemeld en nog niet gereed is',
-    'Dit LN nummer bevat een of meerdere referenties naar Connect Nieuwbouw, maar is niet als 34 of 35 geregisteerd in LN',
-    'Dit LN nummer bevat een referentie naar ChangePoint, maar is niet als 34 geregisteerd in LN',
-    'Connect opdracht is niet als actief aanleg project geregisteerd in Connect',
-    'Dit CPnummer is afgesloten',
-    'LNnr is geen 34-, 35- of 45-nummer',
+observation_messages = [
+    'C07',
+    'C10',
+    'C11',
+    'C18',
 ]
 
 
@@ -320,10 +318,10 @@ def update_data_dashboard():
                 print(text6)
                 update_czCleaning(overview.fillna(''), session=session)
 
-            overview['observation_count'] = 0
+            overview['observation_count'] = 0 
             for obs in observation_messages:
                 mask = (overview['Projectstructuur constateringen'].str.contains(obs).fillna(False))
-                overview.at[mask, 'observation_count'] =+ 1
+                overview.at[mask, 'observation_count'] = overview[mask]['observation_count'] + 1
 
             message = 'Data has been succesfully reloaded'
             color = 'success'
