@@ -174,7 +174,6 @@ class connect_vz():
             'cost_characteristic',
             'reason_cancelation',
             'status_payment',
-            'status_order',
             'date_request',
             'date_request',
             'execution_type',
@@ -305,7 +304,7 @@ class connect_vz():
             self.df = self.df[niet_afgezegd & nietvervallen]
 
     def extract_active_orders(self, df):
-        # Vind alle con opdracht ids waarvan alle objecten de status_order Gereed, status_object Gereed | Vervallen, status_request Gereed en status_payment Afgerekend hebben
+        # Vind alle con opdracht ids waarvan alle objecten de status_object Gereed | Vervallen, status_request Gereed en status_payment Afgerekend hebben
         check = df.copy()
         check.at[(check['status_object'] == 'Vervallen') |
                  check['reason_cancelation'].notna(),
@@ -315,14 +314,13 @@ class connect_vz():
         check = check.merge(df.groupby(['con_opdrachtid'])['con_objectid'].count().reset_index(),
                             on='con_opdrachtid',
                             how='left')
-        check = check.merge(df[['con_opdrachtid', 'status_order', 'status_request']].drop_duplicates(),
+        check = check.merge(df[['con_opdrachtid', 'status_request']].drop_duplicates(),
                             on='con_opdrachtid',
                             how='left')
 
         gereed = (check['status_request'] == 'Gereed') & \
             (check['status_payment'] == 'Afgerekend') & \
-            (check['con_objectid'] == check['afgerekend']) & \
-            (check['status_order'] == 'Gereed')
+            (check['con_objectid'] == check['afgerekend'])
 
         gereed = check[gereed]['con_opdrachtid'].tolist()
         gereed = df['con_opdrachtid'].isin(gereed)
@@ -824,11 +822,12 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed
     mask = (overview['afgerekend'].fillna(False))
-    overview.at[mask, 'F03'] = 'F03_Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
+    overview.at[mask, 'C03'] = 'C03_Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
 
     # in Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als 35-nummer
     mask = ((overview['ln_id'].fillna('').str.startswith('35')) &
             (overview['bpnr'].notna()) &
+            (overview['con_opdrachtid'].notna()) &
             (overview['type_hierarchy'] == 'Enkelvoudig project'))
     overview.at[mask, 'F04'] = 'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
 
@@ -850,7 +849,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # Connect order is niet meer actief
     mask = (~(overview['active_con'].fillna(True)))
-    overview.at[mask, 'F08'] = 'F08_Connect opdracht is niet actief'
+    overview.at[mask, 'C08'] = 'C08_Connect opdracht is niet actief'
 
     # Dit CPnummer bevindt zich in meerdere LN projecten (alleen voor 31 nummers of 34 nummers)
     mask = ((overview['ln_id'].fillna('').str.startswith('31')) | overview['ln_id'].fillna('').str.startswith('34'))
@@ -938,15 +937,15 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     ###################################################################################################################
     # LN, CP en CON zijn afgesloten
     mask = (overview['bpnr'].notna() & overview['con_opdrachtid'].notna() & overview['ln_id'].notna() &
-            (overview['C10'].notna() | overview['C18'].notna()) & overview['F08'].notna() & overview['F05'].notna())
+            (overview['C10'].notna() | overview['C18'].notna()) & overview['C08'].notna() & overview['F05'].notna())
     overview.at[mask, 'afgesloten'] = 'afgesloten'
     # Geen LN, maar CP en CON zijn afgesloten
     mask = (overview['bpnr'].notna() & overview['con_opdrachtid'].notna() & overview['ln_id'].isna() &
-            (overview['C10'].notna() | overview['C18'].notna()) & overview['F08'].notna())
+            (overview['C10'].notna() | overview['C18'].notna()) & overview['C08'].notna())
     overview.at[mask, 'afgesloten'] = 'afgesloten'
     # Geen CP, maar LN en CON zijn afgesloten
     mask = (overview['bpnr'].isna() & overview['con_opdrachtid'].notna() & overview['ln_id'].notna() &
-            overview['F08'].notna() & overview['F05'].notna())
+            overview['C08'].notna() & overview['F05'].notna())
     overview.at[mask, 'afgesloten'] = 'afgesloten'
     # Geen CON, maar LN en CP zijn afgesloten
     mask = (overview['bpnr'].notna() & overview['con_opdrachtid'].isna() & overview['ln_id'].notna() &
@@ -958,7 +957,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     overview.at[mask, 'afgesloten'] = 'afgesloten'
     # Alleen Connect maar afgesloten
     mask = (overview['bpnr'].isna() & overview['con_opdrachtid'].notna() & overview['ln_id'].isna() &
-            overview['F08'].notna())
+            overview['C08'].notna())
     overview.at[mask, 'afgesloten'] = 'afgesloten'
     # Alleen LN maar afgesloten
     mask = (overview['bpnr'].isna() & overview['con_opdrachtid'].isna() & overview['ln_id'].notna() &
@@ -984,12 +983,12 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # 'F01' = 'F01_Deze Connect opdracht valt over meerdere bouwplannummers'
     # 'F02' = 'F02_Dit connectid bevindt zich in meerdere LN projecten'
-    # 'F03' = 'F03_Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
+    # 'C03' = 'C03_Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
     # 'F04' = 'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
     # 'F05' = 'F05_LNnr is niet actief'
     # 'F06' = 'F06_CP nummer is niet als nieuwbouwproject geregistreerd in CP'
     # 'C07' = 'C07_Connect opdracht is niet als actief aanleg project geregistreerd in Connect'
-    # 'F08' = 'F08_Connect opdracht is niet actief'
+    # 'C08' = 'C08_Connect opdracht is niet actief'
     # 'F09' = 'F09_Dit CPnummer bevindt zich in meerdere LN (hoofd)projecten'
     # 'C10' = 'C10_Dit CPnummer is afgesloten'
     # 'C11' = 'C11_LNnr is geen 31-, 34-, 35- of 45-nummer'
@@ -1003,15 +1002,15 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # FOUTEN
     mapping_fouten_categorie = {
-        '34_nieuwbouw': ['F01', 'F02', 'F03', 'F05', 'F06', 'F08', 'F09', 'C10', 'F17', 'C18'],
+        '34_nieuwbouw': ['F01', 'F02', 'C03', 'F05', 'F06', 'C08', 'F09', 'C10', 'F17', 'C18'],
         '34_vooraanleg': ['F05', 'F06', 'F09', 'C10', 'F17', 'C18'],
         '31_hoofdnet': ['F05', 'F06', 'F09', 'C10', 'F12', 'F15', 'F17', 'C18'],
-        '35_deel': ['F01', 'F02', 'F03', 'F05', 'F06', 'C07', 'F08',
+        '35_deel': ['F01', 'F02', 'C03', 'F05', 'F06', 'C07', 'C08',
                     'C10', 'C11', 'F12', 'F13',  'F15', 'F16', 'F17', 'C18'],
-        '35_enkelvoudig': ['F01', 'F02', 'F03', 'F04', 'F05', 'C07',
-                           'F08', 'C11', 'F13', 'F14', 'F16'],
-        '31_35_intake': ['F01', 'F02', 'F03', 'F06', 'F08', 'C10', 'F17', 'C18'],
-        '35_intake': ['F01', 'F03', 'F08'],
+        '35_enkelvoudig': ['F01', 'F02', 'C03', 'F04', 'F05', 'C07',
+                           'C08', 'C11', 'F13', 'F14', 'F16'],
+        '31_35_intake': ['F01', 'F02', 'C03', 'F06', 'C08', 'C10', 'F17', 'C18'],
+        '35_intake': ['F01', 'C03', 'C08'],
         '31_intake': [],
         'VZ_ontbreekt': []
     }

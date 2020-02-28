@@ -96,10 +96,12 @@ def compute_fases(lncpcon_data, overview, xar):
     status_ln_con = status_ln_con.drop_duplicates()
 
     if status_ln_con['status'].isna().any() or (status_ln_con['status'] == '').any():
-        raise ValueError("Unknown status found ln vs connect")
+        missing = status_ln_con[(status_ln_con['status'].isna()) | (status_ln_con['status'] == '')]
+        raise ValueError("Unknown status found ln vs connect: {}".format(missing.iloc[0]))
 
     if status_ln_cp['status'].isna().any() or (status_ln_cp['status'] == '').any():
-        raise ValueError("Unknown status found ln vs cp")
+        missing = status_ln_cp[(status_ln_cp['status'].isna()) | (status_ln_cp['status'] == '')]
+        raise ValueError("Unknown status found ln vs cp: {}".format(missing.iloc[0]))
 
     status_ln_con['sourceKey'] = status_ln_con['ln_id'] + '|' + status_ln_con['con_opdrachtid']
     d = {}
