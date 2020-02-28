@@ -46,7 +46,7 @@ def get_body():
     jumbotron = html.Div(
         [
             dbc.Collapse(
-                id="collapse",
+                id="collapse1",
                 is_open=False,
             ),
             html.Div(
@@ -220,7 +220,7 @@ def update_cleanheid_tabel():
         return [
             html.Div(graph)
         ]
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return None
 
@@ -252,8 +252,10 @@ def update_data_dashboard():
             data = get_lncpcon_data()
             overview, intake, = compute_projectstucture(data)
 
-            xar = xaris()
-            status_ln_cp, status_ln_con, relevante_xaris = compute_fases(data, overview, xar)
+            # 28-02-2020: Omdat de fases van LN aan het veranderen zijn, hebben we besloten de status vergelijking uit te zetten. Dit
+            # kan weer worden aangezet zodra de fases allemaal zijn uitgedacht. Dit is in overleg met Tim Keiren gedaan op 28-02.
+            # xar = xaris()
+            # status_ln_cp, status_ln_con, relevante_xaris = compute_fases(data, overview, xar)
 
             projectstructuur_fouten = set([])
             for el in set(overview['Projectstructuur constateringen'].fillna('').unique())-set(['', ' ']):
@@ -274,32 +276,32 @@ def update_data_dashboard():
                     load_type='diff',
                 )
                 session.commit()
-                status_ln_cp['sourceKey'] = status_ln_cp["ln_id"] + '|' + status_ln_cp["bpnr"]
-                compare_and_insert(
-                    session,
-                    status_ln_cp, sourceTag=sourcetag2,
-                    sourceKey='sourceKey',
-                    ts=dt.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    load_type='diff',
-                )
-                session.commit()
-                compare_and_insert(
-                    session,
-                    status_ln_con, sourceTag=sourcetag3,
-                    sourceKey='sourceKey',
-                    ts=dt.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    load_type='diff',
-                )
-                session.commit()
-                relevante_xaris['sourceKey'] = relevante_xaris['juist_nummer']
-                compare_and_insert(
-                    session,
-                    relevante_xaris, sourceTag=sourcetag4,
-                    sourceKey='sourceKey',
-                    ts=dt.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    load_type='diff',
-                )
-                session.commit()
+                # status_ln_cp['sourceKey'] = status_ln_cp["ln_id"] + '|' + status_ln_cp["bpnr"]
+                # compare_and_insert(
+                #     session,
+                #     status_ln_cp, sourceTag=sourcetag2,
+                #     sourceKey='sourceKey',
+                #     ts=dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+                #     load_type='diff',
+                # )
+                # session.commit()
+                # compare_and_insert(
+                #     session,
+                #     status_ln_con, sourceTag=sourcetag3,
+                #     sourceKey='sourceKey',
+                #     ts=dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+                #     load_type='diff',
+                # )
+                # session.commit()
+                # relevante_xaris['sourceKey'] = relevante_xaris['juist_nummer']
+                # compare_and_insert(
+                #     session,
+                #     relevante_xaris, sourceTag=sourcetag4,
+                #     sourceKey='sourceKey',
+                #     ts=dt.now().strftime("%Y-%m-%d %H:%M:%S"),
+                #     load_type='diff',
+                # )
+                # session.commit()
 
                 overview = overview.drop('sourceKey', axis=1)
                 intake['sourceKey'] = intake["bpnr"].fillna('') + '|' + intake[opdracht_id].fillna('')
@@ -367,8 +369,8 @@ def update_data_dashboard():
 # Callback reload_button
 @app.callback(
     [
-        Output('collapse', 'children'),
-        Output('collapse', 'is_open')
+        Output('collapse1', 'children'),
+        Output('collapse1', 'is_open')
     ],
     [
         Input('reload_button', 'n_clicks_timestamp'),
