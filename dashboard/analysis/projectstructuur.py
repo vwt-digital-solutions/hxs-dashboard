@@ -970,12 +970,52 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
              (overview['con_opdrachtid'].fillna('').str.contains('ALG')) |
              (overview['con_opdrachtid'].fillna('').str.contains('alg'))))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
+    
+    # Connect opdrachten die over meerdere bouwplannen of LN vallen, maar waarvan er een LN project al is afgerond en
+    # er een nieuwe is opgestart. Dit LN project mag eruitgehaald worden
+    ## Voor dubble bouwplan en LN project
+    mask = ((overview['F01'].notna()) & (overview['F02'].notna()))
+    temp = overview[mask]
+    temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
+    temp = temp[temp['active_ln'] != temp['ln_id']]
+    temp = list(temp.index)
+    # verwijder afgesloten projecten
+    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # verwijder de foutmelding bij het andere project
+    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    overview.at[mask, 'F01'] = np.nan
+    overview.at[mask, 'F02'] = np.nan
+
+    # Voor dubbele bouwplannummers
+    temp = overview[overview['F01'].notna()]
+    temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
+    temp = temp[temp['active_ln'] != temp['ln_id']]
+    temp = list(temp.index)
+    # verwijder afgesloten projecten
+    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # verwijder de foutmelding bij het andere project
+    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    overview.at[mask, 'F01'] = np.nan
+
+    # Voor dubbele bouwplannummers
+    temp = overview[overview['F02'].notna()]
+    temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
+    temp = temp[temp['active_ln'] != temp['ln_id']]
+    temp = list(temp.index)
+    # verwijder afgesloten projecten
+    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    overview.at[mask, 'afgesloten'] = 'afgesloten'
+    # verwijder de foutmelding bij het andere project
+    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    overview.at[mask, 'F02'] = np.nan
+
+    ###################################################################################################################
+    # verwijder afgesloten projecten
     mask = overview['afgesloten'].isna()
     overview.at[mask, 'afgesloten'] = ''
-
-    # verwijder afgesloten projecten
     overview = overview[overview['afgesloten'] == '']
-
 
     ###################################################################################################################
     # Verwijder foutmeldingen die bij een bepaalde categorie niet voor hoeven komen.
