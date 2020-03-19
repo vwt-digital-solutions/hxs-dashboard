@@ -1,12 +1,12 @@
 import config
 import pandas as pd
 import numpy as np
-import sqlalchemy as sa
+# import sqlalchemy as sa
 import utils
 
-from connection import Connection
-from db.queries import read
-from db.models import czHierarchy, czLog, czCleaning
+# from connection import Connection
+# from db.queries import read
+# from db.models import czHierarchy, czLog, czCleaning
 from analysis.projectstructuur import xaris_status_check
 
 
@@ -35,9 +35,12 @@ def compute_fases(lncpcon_data, overview, xar):
     ln_fase = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='ln').replace(np.nan, '')
     ln_fase['ln_fase'] = ln_fase['ln_fase'].str[:3].astype(str)
     cp_fase = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='cp').replace(np.nan, '')
-    con_aan_fase = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='con_aanvraagstatus').replace(np.nan, '')
-    con_obj_fase = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='con_objectstatus').replace(np.nan, '')
-    con_afr_fase = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='con_afrekenstatus').replace(np.nan, '').replace('[empty]', '')
+    con_aan_fase = utils.download_as_dataframe(
+        config.tmp_bucket, config.files['fases'], sheet_name='con_aanvraagstatus').replace(np.nan, '')
+    con_obj_fase = utils.download_as_dataframe(
+        config.tmp_bucket, config.files['fases'], sheet_name='con_objectstatus').replace(np.nan, '')
+    con_afr_fase = utils.download_as_dataframe(
+        config.tmp_bucket, config.files['fases'], sheet_name='con_afrekenstatus').replace(np.nan, '').replace('[empty]', '')
     con_cols = ['con_request', 'con_object', 'con_payment']
 
     LNvsCP = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='ln_vs_cp')
@@ -55,7 +58,8 @@ def compute_fases(lncpcon_data, overview, xar):
     con_fases_correct = fix_fases(connect, con=True)
     connect_fase = con_fases_correct[['con_opdrachtid', 'con_objectid'] + con_cols].fillna('')
     connect_tot = connect_fase.groupby(['con_opdrachtid'])['con_objectid'].count().reset_index().rename(columns={'con_objectid': 'totaal'})
-    connect_fase = connect_fase.groupby(['con_opdrachtid'] + con_cols)['con_objectid'].count().reset_index().rename(columns={'con_objectid': 'aantal_conobj'})
+    connect_fase = connect_fase.groupby(
+        ['con_opdrachtid'] + con_cols)['con_objectid'].count().reset_index().rename(columns={'con_objectid': 'aantal_conobj'})
     connect_fase = connect_fase.merge(connect_tot, on='con_opdrachtid').reset_index(drop=True)
     connect_fase.at[:, 'verhouding'] = connect_fase['aantal_conobj'] / connect_fase['totaal']
     connect_all = connect_fase
@@ -77,9 +81,11 @@ def compute_fases(lncpcon_data, overview, xar):
     ln_vs_cp_nb = ln_vs_cp[ln_vs_cp['categorie'] == '34_nieuwbouw']
     ln_vs_cp_al = ln_vs_cp[ln_vs_cp['categorie'] == '34_vooraanleg']
 
-    status_ln_cp_nb = pd.merge(ln_vs_cp_nb, LNvsCP[['lnfase', 'cpfase', 'nieuwbouw']], how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
+    status_ln_cp_nb = pd.merge(
+        ln_vs_cp_nb, LNvsCP[['lnfase', 'cpfase', 'nieuwbouw']], how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
     status_ln_cp_nb = status_ln_cp_nb.rename(columns={'nieuwbouw': 'status'})
-    status_ln_cp_al = pd.merge(ln_vs_cp_al, LNvsCP[['lnfase', 'cpfase', 'vooraanleg']], how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
+    status_ln_cp_al = pd.merge(
+        ln_vs_cp_al, LNvsCP[['lnfase', 'cpfase', 'vooraanleg']], how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
     status_ln_cp_al = status_ln_cp_al.rename(columns={'vooraanleg': 'status'})
     status_ln_cp = pd.concat([status_ln_cp_nb, status_ln_cp_al], sort=True).reset_index(drop=True)
     status_ln_cp = status_ln_cp[['ln_id', 'bpnr', 'lnfase', 'cpfase', 'categorie', 'status']]
@@ -92,14 +98,18 @@ def compute_fases(lncpcon_data, overview, xar):
     status_ln_con = pd.merge(ln_vs_con, LNvsCon, how='left',
                              left_on=['lnfase', 'con_request', 'con_object', 'con_payment'],
                              right_on=['lnfase', 'con_request', 'con_object', 'con_payment'])
-    status_ln_con = status_ln_con[['ln_id', 'con_opdrachtid', 'con_request', 'con_object', 'con_payment', 'lnfase', 'status', 'aantal_conobj', 'totaal', 'verhouding']]
+    status_ln_con = status_ln_con[
+        ['ln_id', 'con_opdrachtid', 'con_request', 'con_object', 'con_payment',
+         'lnfase', 'status', 'aantal_conobj', 'totaal', 'verhouding']]
     status_ln_con = status_ln_con.drop_duplicates()
 
     if status_ln_con['status'].isna().any() or (status_ln_con['status'] == '').any():
-        raise ValueError("Unknown status found ln vs connect")
+        missing = status_ln_con[(status_ln_con['status'].isna()) | (status_ln_con['status'] == '')]
+        raise ValueError("Unknown status found ln vs connect: {}".format(missing.iloc[0]))
 
     if status_ln_cp['status'].isna().any() or (status_ln_cp['status'] == '').any():
-        raise ValueError("Unknown status found ln vs cp")
+        missing = status_ln_cp[(status_ln_cp['status'].isna()) | (status_ln_cp['status'] == '')]
+        raise ValueError("Unknown status found ln vs cp: {}".format(missing.iloc[0]))
 
     status_ln_con['sourceKey'] = status_ln_con['ln_id'] + '|' + status_ln_con['con_opdrachtid']
     d = {}

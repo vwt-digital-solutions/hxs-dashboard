@@ -311,7 +311,7 @@ def expand_column(df, column_name, splitter=','):
 
 def get_bpnr_regex(cell):
     reconstruction = re.compile(r'(REC20\d{7})')
-    nonreconstruction = re.compile(r'(20\d{7})')
+    nonreconstruction = re.compile(r'(20\d{7})|(71\d{7})')
     bpnr = reconstruction.findall(cell)
     if len(bpnr) == 0:
         bpnr = nonreconstruction.findall(cell)

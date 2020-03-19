@@ -6,7 +6,7 @@ import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 
 from dash.dependencies import Input, Output, State
-from apps.elements import styles, table_styles, styles, button, site_colors
+from apps.elements import styles, table_styles, button, site_colors
 from apps.elements import get_filter_options
 from app import app
 from db.models import czCleaning
@@ -60,8 +60,8 @@ def get_body():
                         "Selecteer hieronder een combinatie van constateringen",
                         className="lead",
                             )
-                    ],
-                    style = {
+                     ],
+                    style={
                         'textAlign': 'center',
                         'margin-top': '1%',
                         },
@@ -75,26 +75,22 @@ def get_body():
             ),
             html.Div([
                 html.Div(
-                [
-                    html.H4('Selecteer een of meerdere categoriën',
-                        className='lead',
-                            )
-                    ],
-                    style = {
-                        'textAlign': 'center',
-                        'margin-top': '1%',
-                        },
-                    ),
-                    dbc.Row([
-                        category_dropdown,
-                    ],
-                ),
+                            [
+                                html.H4('Selecteer een of meerdere categoriën',
+                                        className='lead',
+                                        )
+                             ],
+                            style={
+                                     'textAlign': 'center',
+                                     'margin-top': '1%',
+                                   },
+                         ),
+                dbc.Row([category_dropdown]),
             ],
-            style=styles['box_header'],
-            ),
-            html.Div(id = 'problem_count',
                 style=styles['box_header'],
             ),
+            html.Div(id='problem_count',
+                     style=styles['box_header']),
             html.Div(
                 html.Div([
                     dash_table.DataTable(
@@ -119,11 +115,11 @@ def get_body():
                         style_header=table_styles['header'],
                         style_cell=table_styles['cell']['problem'],
                         style_filter=table_styles['filter'],
-                        style_cell_conditional = table_styles['cell']['conditional'],
+                        style_cell_conditional=table_styles['cell']['conditional'],
                     ),
-                    html.Div(id = 'problem_user_table'),
+                    html.Div(id='problem_user_table'),
                     ],
-            ),
+                ),
                 style=styles['table_page'],
             )
             ]
@@ -136,7 +132,8 @@ def get_problem_table(overview, pr_dropdown_values, category_values, status):
     mask = overview.index.notna()
     for el in pr_dropdown_values:
         if el == 'Geen constateringen':
-            mask &= (overview['Projectstructuur constateringen'] == '')
+            mask &= ((overview['Projectstructuur constateringen'] == '') |
+                     (overview['Projectstructuur constateringen'].isna()))
         else:
             mask &= (overview['Projectstructuur constateringen'].str.contains(el, regex=False))
     mask &= (overview['categorie'].isin(category_values))
@@ -155,9 +152,11 @@ def update_problem_table(pr_dropdown_values, category_values, status):
     with Connection('r', 'read overview: update_problem_table') as session:
         overview = read(session, 'projectstructure')
 
-    col_order = ['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling']
+    col_order = ['ln_id', 'bpnr', 'con_opdrachtid', 'categorie',
+                 'Projectstructuur constateringen', 'koppeling']
     overview = overview[col_order]
-    dataframe = get_problem_table(overview, pr_dropdown_values, category_values, status)
+    dataframe = get_problem_table(
+        overview, pr_dropdown_values, category_values, status)
 
     table_data = {
         'columns':
@@ -171,7 +170,7 @@ def update_problem_table(pr_dropdown_values, category_values, status):
     counter = [
         dbc.Row(
             [
-            dbc.Col(
+             dbc.Col(
                 html.Div(
                     html.P('''
                         {}/{} combinaties |
@@ -188,14 +187,14 @@ def update_problem_table(pr_dropdown_values, category_values, status):
                         ),
                         # className="lead",
                     ),
-                style = {
-                    'textAlign': 'center',
-                    'margin-top': '1.5%',
+                    style={
+                        'textAlign': 'center',
+                        'margin-top': '1.5%',
                     },
                 ),
                 width={'size': 10, 'order': 1}
-            ),
-            dbc.Col(
+             ),
+             dbc.Col(
                 html.Div(
                     html.A(
                         button("Download", backgroundcolor=site_colors['indigo']),
@@ -295,7 +294,8 @@ def update_ln_table(
             fillna("").\
             rename(columns={'status': 'bewerkingsstatus'})
 
-    problem = update_problem_table(pr_dropdown_values, category_values, status.drop('updated', axis = 1))
+    problem = update_problem_table(
+        pr_dropdown_values, category_values, status.drop('updated', axis=1))
 
     return [
             problem[0]['data'],
