@@ -42,7 +42,9 @@ class AzureOAuth(Auth):
         if request.args.get('access_token') or session.get('access_token'):
             if request.args.get('access_token'):
                 session['access_token'] = request.args.get('access_token')
-            token_info = self._e2e_jwkaas.get_token_info((session['access_token'] if session.get('access_token') else request.args.get('access_token')))
+            token_info = self._e2e_jwkaas.get_token_info(
+                (session['access_token'] if session.get('access_token')
+                    else request.args.get('access_token')))
             if not token_info or token_info['appid'] != self.e2e_client_id:
                 logging.warning('Invalid access token')
                 return abort(401)
