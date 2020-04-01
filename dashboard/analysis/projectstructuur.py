@@ -534,6 +534,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     # Bepaal alle combinaties voor 34, 35 en 45 nummers
     mask = ((ln.df['ln_id'].str.startswith('34')) |
             (ln.df['ln_id'].str.startswith('35')) |
+            (ln.df['ln_id'].str.startswith('40')) |
             (ln.df['ln_id'].str.startswith('45')))
     nummer34 = ln.df[mask][['ln_id', 'search_argument', 'search_argument2']].rename(
         columns={'search_argument': 'con_opdrachtid', 'search_argument2': 'bpnr'})
@@ -578,6 +579,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
         ((ln.df['ln_id'].str.startswith('34')) |
          (ln.df['ln_id'].str.startswith('35')) |
          (ln.df['ln_id'].str.startswith('45')) |
+         (ln.df['ln_id'].str.startswith('40')) |
          (ln.df['ln_id'].str.startswith('31')))
     )
     temp = ln.df[mask][['ln_id', 'search_argument', 'search_argument2']].rename(
@@ -723,7 +725,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     df_cp.drop_duplicates(inplace=True)
     overview = overview.merge(df_cp, on='bpnr', how='left')
 
-    # Duplicates eruit halen
+    # Duplicates eruit halen (duplicate combinations)
     overview = overview.drop_duplicates(subset=['ln_id', 'bpnr', 'con_opdrachtid'], keep='first')
 
     overview['dup_ln_bpnr'] = overview.duplicated(subset=['ln_id', 'bpnr'], keep=False)
@@ -801,6 +803,10 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             (overview['con_opdrachtid'].notna()) &
             (overview['bpnr'].isna()))
     overview.at[mask, 'categorie'] = '35_intake'
+
+    # 40_expenses
+    mask = ((overview['ln_id'].fillna('').str.startswith('40')))
+    overview.at[mask, 'categorie'] = '40_expenses'
 
     # de projecten die niet met een juist nummer beginnen worden onder 35_enkelvoudig ingedeeld
     mask = overview['categorie'].isna()
@@ -1054,7 +1060,8 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
         '31_35_intake': ['F01', 'F02', 'C03', 'F06', 'C08', 'C10', 'F17', 'C18'],
         '35_intake': ['F01', 'C03', 'C08'],
         '31_intake': [],
-        'VZ_ontbreekt': []
+        'VZ_ontbreekt': [],
+        '40_expenses': []
     }
 
     foutmeldingen = pd.DataFrame([])
