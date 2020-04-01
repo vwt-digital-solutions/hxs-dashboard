@@ -42,10 +42,12 @@ class AzureOAuth(Auth):
         if request.args.get('access_token') or session.get('access_token'):
             if request.args.get('access_token'):
                 session['access_token'] = request.args.get('access_token')
-            token_info = self._e2e_jwkaas.get_token_info((session['access_token'] if session.get('access_token') else request.args.get('access_token')))
+            token_info = self._e2e_jwkaas.get_token_info(
+                (session['access_token'] if session.get('access_token')
+                    else request.args.get('access_token')))
             if not token_info or token_info['appid'] != self.e2e_client_id:
                 logging.warning('Invalid access token')
-                return abort(403)
+                return abort(401)
             self.user = 'opensource.e2e@vwtelecom.com'
             token_info['roles'] = ['czdashboard.user']
         else:
@@ -61,10 +63,10 @@ class AzureOAuth(Auth):
                 return True
             else:
                 logging.warning('Missing required role czdashboard.user')
-                return abort(403)
+                return abort(401)
         else:
             logging.warning('Invalid access token')
-            return abort(403)
+            return abort(401)
 
     def login_request(self):
         # send to azure auth page
@@ -84,7 +86,7 @@ class AzureOAuth(Auth):
     def auth_wrapper(self, f):
         def wrap(*args, **kwargs):
             if not self.is_authorized():
-                return Response(status=403)
+                return Response(status=401)
 
             response = f(*args, **kwargs)
             logging.info(response)

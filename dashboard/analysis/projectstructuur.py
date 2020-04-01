@@ -1,4 +1,4 @@
-import os
+# import os
 import utils
 import config
 import numpy as np
@@ -10,7 +10,7 @@ from analysis.connectz import expand_column
 from datetime import datetime as dt
 from db.queries import read
 from connection import Connection
-from db.models import czHierarchy, czImportKeys, czSubscriptions, czLog
+from db.models import czHierarchy, czLog
 
 
 def merge_columns_text(df, columnnames, columnname_new=None, connector='; '):
@@ -304,7 +304,8 @@ class connect_vz():
             self.df = self.df[niet_afgezegd & nietvervallen]
 
     def extract_active_orders(self, df):
-        # Vind alle con opdracht ids waarvan alle objecten de status_object Gereed | Vervallen, status_request Gereed en status_payment Afgerekend hebben
+        # Vind alle con opdracht ids waarvan alle objecten de status_object
+        # Gereed | Vervallen, status_request Gereed en status_payment Afgerekend hebben
         check = df.copy()
         check.at[(check['status_object'] == 'Vervallen') |
                  check['reason_cancelation'].notna(),
@@ -368,7 +369,8 @@ class xaris():
         self.df.at[self.df['Status Xaris'].isna(), 'Status Xaris'] = 'Actief'
         self.df.drop(['vervallen', 'gereed'], axis='columns', inplace=True)
 
-        # soms is het hoofdleidingprojectnummer slechts bij 1 van de werkstromen ingevuld. Om er zeker van te zijn dat ze bij iedere werkstroom
+        # soms is het hoofdleidingprojectnummer slechts
+        # bij 1 van de werkstromen ingevuld. Om er zeker van te zijn dat ze bij iedere werkstroom
         # zijn ingevuld (mits er uberhaupt een aanwezig is):
         self.df['Hoofdleidingenprojectnummer'] = self.df.groupby(
             'juist_nummer')['Hoofdleidingenprojectnummer'].fillna(method='ffill')
@@ -829,7 +831,8 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             (overview['bpnr'].notna()) &
             (overview['con_opdrachtid'].notna()) &
             (overview['type_hierarchy'] == 'Enkelvoudig project'))
-    overview.at[mask, 'F04'] = 'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
+    overview.at[mask, 'F04'] = \
+        'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
 
     # LNnr is niet actief
     mask = ((~overview['active_ln'].fillna(True)) | (overview['ln_id'].isin(list(ln.df_nonActive['ln_id'].unique()))))
@@ -931,7 +934,6 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     overview.at[overview['bpnr'].isin(cancel['bpnr'].tolist()) &
                 overview['bpnr'].notna(), 'C18'] = "C18_Dit CPnummer is gecanceled"
 
-
     ###################################################################################################################
     # Verwijder afgesloten projecten
     ###################################################################################################################
@@ -970,10 +972,10 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
              (overview['con_opdrachtid'].fillna('').str.contains('ALG')) |
              (overview['con_opdrachtid'].fillna('').str.contains('alg'))))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
-    
+
     # Connect opdrachten die over meerdere bouwplannen of LN vallen, maar waarvan er een LN project al is afgerond en
     # er een nieuwe is opgestart. Dit LN project mag eruitgehaald worden
-    ## Voor dubble bouwplan en LN project
+    # Voor dubble bouwplan en LN project
     mask = ((overview['F01'].notna()) & (overview['F02'].notna()))
     temp = overview[mask]
     temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})

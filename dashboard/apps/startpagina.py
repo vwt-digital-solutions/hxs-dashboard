@@ -17,8 +17,8 @@ import plotly.graph_objs as go
 
 # Imports for data update cleaning
 from db.queries import update_czCleaning, update_dropdown_values
-from analysis.projectstructuur import compute_projectstucture, get_lncpcon_data, xaris
-from analysis.fases_to_DB import compute_fases
+from analysis.projectstructuur import compute_projectstucture, get_lncpcon_data
+# from analysis.fases_to_DB import compute_fases
 
 
 opdracht_id = 'con_opdrachtid'
@@ -85,7 +85,8 @@ def get_body():
                         "Op deze pagina staat de uitleg van het probleem en de actie die ondernomen moet worden.",
                         className='lead'),
                     html.P(
-                        "Omvat de actie een aanpassing van het bouwplannummer in Connect, dan kan dit worden aangepast op het tabblad 'Connect - Objectniveau'.",
+                        "Omvat de actie een aanpassing van het bouwplannummer in Connect, dan kan dit worden aangepast" +
+                        "op het tabblad 'Connect - Objectniveau'.",
                         className="lead"),
                     html.A(button(
                             "Klik hier om te beginnen",
@@ -135,7 +136,7 @@ def update_cleanheid_tabel():
             where(czLog.action == 'reload_end')
     df = pd.read_sql(q, session.bind, coerce_float=False)
 
-    mask = ((df['description'] != 'failure') & (df['description'].str.count(':') ==3))
+    mask = ((df['description'] != 'failure') & (df['description'].str.count(':') == 3))
     df.at[mask, 'description'] = df['description'] + '| _notes:0'
 
     try:
@@ -266,7 +267,8 @@ def update_data_dashboard():
             with Connection('w', 'update projectstructure') as session:
                 # Update projectstructure
                 print('Insert projectstructuur')
-                overview['sourceKey'] = overview["ln_id"].fillna('') + '|' + overview["bpnr"].fillna('') + '|' + overview[opdracht_id].fillna('')
+                overview['sourceKey'] = overview["ln_id"].fillna('') + '|' + \
+                    overview["bpnr"].fillna('') + '|' + overview[opdracht_id].fillna('')
                 compare_and_insert(
                     session,
                     overview,
