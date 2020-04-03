@@ -907,7 +907,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     mask = overview['ln_id'].fillna('').str.startswith('31')
     temp = overview[mask][['ln_id', 'bpnr']].rename(columns={'ln_id': 'ln_id_hoofdproject', 'bpnr': 'bpnr_hoofdproject'})
     temp = overview[overview['main_project'].notna()].merge(temp, left_on='main_project', right_on='ln_id_hoofdproject', how='left')
-    mask = temp['bpnr'] != temp['bpnr_hoofdproject']
+    mask = ((temp['bpnr'] != temp['bpnr_hoofdproject']) & (temp['active_ln'] == True))
     temp = list(temp[mask]['ln_id'].unique())
     mask = overview['ln_id'].isin(temp)
     overview.at[mask, 'F15'] = 'F15_Hoofdproject en deelproject hebben een ander bouwplannummer'
