@@ -745,17 +745,17 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     mask = ((overview['dup_bpnr_con']) & (overview['ln_id'].isna()))
     overview = overview[~mask]
 
-    overview['d_bpnr'] = overview['bpnr'].duplicated(keep=False)
+    # enkele nummers die al wel in een combinatie voorkomen eruit halen. Het kan wel zo zijn dat
+    # een bpnr in intake staat en al voorkomt in een combinatie als de combinatie een geen 31 of 34 
+    # nummer is. Daarom hier alleen kijken naar LN en Con
     overview['d_ln'] = overview['ln_id'].duplicated(keep=False)
     overview['d_con'] = overview['con_opdrachtid'].duplicated(keep=False)
 
-    mask = ((overview['d_bpnr'] & overview['ln_id'].isna() & overview['con_opdrachtid'].isna()))
-    overview = overview[~mask]
     mask = ((overview['d_ln'] & overview['bpnr'].isna() & overview['con_opdrachtid'].isna()))
     overview = overview[~mask]
     mask = ((overview['d_con'] & overview['ln_id'].isna() & overview['bpnr'].isna()))
     overview = overview[~mask]
-    overview = overview.drop(columns=['dup_ln_bpnr', 'dup_ln_con', 'dup_bpnr_con', 'd_bpnr', 'd_ln', 'd_con'])
+    overview = overview.drop(columns=['dup_ln_bpnr', 'dup_ln_con', 'dup_bpnr_con', 'd_ln', 'd_con'])
 
     ###################################################################################################################
     # Categorisering van de combinaties
