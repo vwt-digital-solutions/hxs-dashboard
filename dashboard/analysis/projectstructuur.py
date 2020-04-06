@@ -624,9 +624,14 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             (cp_totaal['cp_fase'].str.startswith('99.')) |
             (cp_totaal['cp_fase'].str.startswith('301.')))
     cp_totaal = cp_totaal[~mask]
+    # Het is intake als er nog geen 31 of 34 nummer voor bestaat, en als het bpnr ook
+    # nog niet in intake voorkomt
+    mask = ((overview['ln_id'].fillna('').str.startswith('31')) |
+            (overview['ln_id'].fillna('').str.startswith('34')))
+    bpnr_34_31 = list(overview[mask]['bpnr'])
     mask = ((cp_totaal['bpnr'].notna()) &
             (~cp_totaal['bpnr'].isin(intake['bpnr'].tolist())) &
-            (~cp_totaal['bpnr'].isin(overview['bpnr'].tolist())))
+            (~cp_totaal['bpnr'].isin(bpnr_34_31)))
     temp = cp_totaal[mask]
     temp['koppeling'] = 'CP'
     temp = temp[['bpnr', 'koppeling']]
@@ -981,17 +986,19 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # Connect opdrachten die over meerdere bouwplannen of LN vallen, maar waarvan er een LN project al is afgerond en
     # er een nieuwe is opgestart. Dit LN project mag eruitgehaald worden
+    
     # Voor dubble bouwplan en LN project
     mask = ((overview['F01'].notna()) & (overview['F02'].notna()))
     temp = overview[mask]
     temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
     temp = temp[temp['active_ln'] != temp['ln_id']]
-    temp = list(temp.index)
     # verwijder afgesloten projecten
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    mask = ((overview['con_opdrachtid'].isin(list(temp.index))) & (~overview['active_ln'].fillna(True)))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
-    # verwijder de foutmelding bij het andere project
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    # verwijder de foutmelding bij de bijbehorende projecten (mits er nog slechts een actief
+    # project is)
+    diff = list(temp[temp['active_ln'] == 1].index)
+    mask = ((overview['con_opdrachtid'].isin(diff)) & (overview['active_ln'].fillna(True)))
     overview.at[mask, 'F01'] = np.nan
     overview.at[mask, 'F02'] = np.nan
 
@@ -999,24 +1006,26 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     temp = overview[overview['F01'].notna()]
     temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
     temp = temp[temp['active_ln'] != temp['ln_id']]
-    temp = list(temp.index)
     # verwijder afgesloten projecten
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    mask = ((overview['con_opdrachtid'].isin(list(temp.index))) & (~overview['active_ln'].fillna(True)))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
-    # verwijder de foutmelding bij het andere project
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    # verwijder de foutmelding bij de bijbehorende projecten (mits er nog slechts een actief
+    # project is)
+    diff = list(temp[temp['active_ln'] == 1].index)
+    mask = ((overview['con_opdrachtid'].isin(diff)) & (overview['active_ln'].fillna(True)))
     overview.at[mask, 'F01'] = np.nan
 
     # Voor dubbele bouwplannummers
     temp = overview[overview['F02'].notna()]
     temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
     temp = temp[temp['active_ln'] != temp['ln_id']]
-    temp = list(temp.index)
     # verwijder afgesloten projecten
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    mask = ((overview['con_opdrachtid'].isin(list(temp.index))) & (~overview['active_ln'].fillna(True)))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
-    # verwijder de foutmelding bij het andere project
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    # verwijder de foutmelding bij de bijbehorende projecten (mits er nog slechts een actief
+    # project is)
+    diff = list(temp[temp['active_ln'] == 1].index)
+    mask = ((overview['con_opdrachtid'].isin(diff)) & (overview['active_ln'].fillna(True)))
     overview.at[mask, 'F02'] = np.nan
 
     ###################################################################################################################
