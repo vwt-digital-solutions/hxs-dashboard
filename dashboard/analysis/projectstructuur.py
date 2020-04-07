@@ -885,7 +885,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             overview['ln_id'].fillna('').str.startswith('35') |
             overview['ln_id'].fillna('').str.startswith('45')) &
             overview['ln_id'].notna())
-    overview.at[mask, 'C11'] = 'C11_LNnr is geen 31-, 34-, 35- of 45-nummer'
+    overview.at[mask, 'F11'] = 'F11_LNnr is geen 31-, 34-, 35- of 45-nummer'
 
     # LN: hoofd/deelproject zonder zoekreferentie II (bouwplan)
     mask = (((ln.df['type_hierarchy'] == 'Hoofdproject') | (ln.df['type_hierarchy'] == 'Deelproject')) &
@@ -1048,7 +1048,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     # 'C08' = 'C08_Connect opdracht is niet actief'
     # 'F09' = 'F09_Dit CPnummer bevindt zich in meerdere LN (hoofd)projecten'
     # 'C10' = 'C10_Dit CPnummer is afgesloten'
-    # 'C11' = 'C11_LNnr is geen 31-, 34-, 35- of 45-nummer'
+    # 'F11' = 'F11_LNnr is geen 31-, 34-, 35- of 45-nummer'
     # 'F12' = 'F12_LN: hoofd/deelproject zonder zoekreferentie II (bouwplan)'
     # 'F13' = 'F13_LN: enkel/deelproject zonder zoekreferentie I (connect)'
     # 'F14' = 'F14_LN: enkelvoudig project met zoekreferentie II (bpnr)'
@@ -1063,15 +1063,15 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
         '34_vooraanleg': ['F05', 'F06', 'F09', 'C10', 'F17', 'C18'],
         '31_hoofdnet': ['F05', 'F06', 'F09', 'C10', 'F12', 'F15', 'F17', 'C18'],
         '35_deel': ['F01', 'F02', 'C03', 'F05', 'F06', 'C07', 'C08',
-                    'C10', 'C11', 'F12', 'F13',  'F15', 'F16', 'F17', 'C18'],
+                    'C10', 'F11', 'F12', 'F13',  'F15', 'F16', 'F17', 'C18'],
         '35_enkelvoudig': ['F01', 'F02', 'C03', 'F04', 'F05', 'C07',
-                           'C08', 'C11', 'F13', 'F14', 'F16'],
+                           'C08', 'F11', 'F13', 'F14', 'F16'],
         '31_35_intake': ['F01', 'F02', 'C03', 'F06', 'C08', 'C10', 'F17', 'C18'],
         '35_intake': ['F01', 'C03', 'C08'],
         '31_intake': [],
         'VZ_ontbreekt': [],
         '40_expenses': ['F01', 'F02', 'C03', 'F04', 'F05', 'C07',
-                           'C08', 'C11', 'F13', 'F14', 'F16']
+                           'C08', 'F11', 'F13', 'F14', 'F16']
     }
 
     foutmeldingen = pd.DataFrame([])
