@@ -534,6 +534,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     # Bepaal alle combinaties voor 34, 35 en 45 nummers
     mask = ((ln.df['ln_id'].str.startswith('34')) |
             (ln.df['ln_id'].str.startswith('35')) |
+            (ln.df['ln_id'].str.startswith('40')) |
             (ln.df['ln_id'].str.startswith('45')))
     nummer34 = ln.df[mask][['ln_id', 'search_argument', 'search_argument2']].rename(
         columns={'search_argument': 'con_opdrachtid', 'search_argument2': 'bpnr'})
@@ -578,6 +579,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
         ((ln.df['ln_id'].str.startswith('34')) |
          (ln.df['ln_id'].str.startswith('35')) |
          (ln.df['ln_id'].str.startswith('45')) |
+         (ln.df['ln_id'].str.startswith('40')) |
          (ln.df['ln_id'].str.startswith('31')))
     )
     temp = ln.df[mask][['ln_id', 'search_argument', 'search_argument2']].rename(
@@ -622,9 +624,14 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             (cp_totaal['cp_fase'].str.startswith('99.')) |
             (cp_totaal['cp_fase'].str.startswith('301.')))
     cp_totaal = cp_totaal[~mask]
+    # Het is intake als er nog geen 31 of 34 nummer voor bestaat, en als het bpnr ook
+    # nog niet in intake voorkomt
+    mask = ((overview['ln_id'].fillna('').str.startswith('31')) |
+            (overview['ln_id'].fillna('').str.startswith('34')))
+    bpnr_34_31 = list(overview[mask]['bpnr'])
     mask = ((cp_totaal['bpnr'].notna()) &
             (~cp_totaal['bpnr'].isin(intake['bpnr'].tolist())) &
-            (~cp_totaal['bpnr'].isin(overview['bpnr'].tolist())))
+            (~cp_totaal['bpnr'].isin(bpnr_34_31)))
     temp = cp_totaal[mask]
     temp['koppeling'] = 'CP'
     temp = temp[['bpnr', 'koppeling']]
@@ -723,7 +730,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     df_cp.drop_duplicates(inplace=True)
     overview = overview.merge(df_cp, on='bpnr', how='left')
 
-    # Duplicates eruit halen
+    # Duplicates eruit halen (duplicate combinations)
     overview = overview.drop_duplicates(subset=['ln_id', 'bpnr', 'con_opdrachtid'], keep='first')
 
     overview['dup_ln_bpnr'] = overview.duplicated(subset=['ln_id', 'bpnr'], keep=False)
@@ -738,17 +745,17 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     mask = ((overview['dup_bpnr_con']) & (overview['ln_id'].isna()))
     overview = overview[~mask]
 
-    overview['d_bpnr'] = overview['bpnr'].duplicated(keep=False)
+    # enkele nummers die al wel in een combinatie voorkomen eruit halen. Het kan wel zo zijn dat
+    # een bpnr in intake staat en al voorkomt in een combinatie als de combinatie een geen 31 of 34 
+    # nummer is. Daarom hier alleen kijken naar LN en Con
     overview['d_ln'] = overview['ln_id'].duplicated(keep=False)
     overview['d_con'] = overview['con_opdrachtid'].duplicated(keep=False)
 
-    mask = ((overview['d_bpnr'] & overview['ln_id'].isna() & overview['con_opdrachtid'].isna()))
-    overview = overview[~mask]
     mask = ((overview['d_ln'] & overview['bpnr'].isna() & overview['con_opdrachtid'].isna()))
     overview = overview[~mask]
     mask = ((overview['d_con'] & overview['ln_id'].isna() & overview['bpnr'].isna()))
     overview = overview[~mask]
-    overview = overview.drop(columns=['dup_ln_bpnr', 'dup_ln_con', 'dup_bpnr_con', 'd_bpnr', 'd_ln', 'd_con'])
+    overview = overview.drop(columns=['dup_ln_bpnr', 'dup_ln_con', 'dup_bpnr_con', 'd_ln', 'd_con'])
 
     ###################################################################################################################
     # Categorisering van de combinaties
@@ -801,6 +808,10 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             (overview['con_opdrachtid'].notna()) &
             (overview['bpnr'].isna()))
     overview.at[mask, 'categorie'] = '35_intake'
+
+    # 40_expenses
+    mask = ((overview['ln_id'].fillna('').str.startswith('40')))
+    overview.at[mask, 'categorie'] = '40_expenses'
 
     # de projecten die niet met een juist nummer beginnen worden onder 35_enkelvoudig ingedeeld
     mask = overview['categorie'].isna()
@@ -901,7 +912,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     mask = overview['ln_id'].fillna('').str.startswith('31')
     temp = overview[mask][['ln_id', 'bpnr']].rename(columns={'ln_id': 'ln_id_hoofdproject', 'bpnr': 'bpnr_hoofdproject'})
     temp = overview[overview['main_project'].notna()].merge(temp, left_on='main_project', right_on='ln_id_hoofdproject', how='left')
-    mask = temp['bpnr'] != temp['bpnr_hoofdproject']
+    mask = ((temp['bpnr'] != temp['bpnr_hoofdproject']) & (temp['active_ln'] == True))
     temp = list(temp[mask]['ln_id'].unique())
     mask = overview['ln_id'].isin(temp)
     overview.at[mask, 'F15'] = 'F15_Hoofdproject en deelproject hebben een ander bouwplannummer'
@@ -975,17 +986,19 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # Connect opdrachten die over meerdere bouwplannen of LN vallen, maar waarvan er een LN project al is afgerond en
     # er een nieuwe is opgestart. Dit LN project mag eruitgehaald worden
+    
     # Voor dubble bouwplan en LN project
     mask = ((overview['F01'].notna()) & (overview['F02'].notna()))
     temp = overview[mask]
     temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
     temp = temp[temp['active_ln'] != temp['ln_id']]
-    temp = list(temp.index)
     # verwijder afgesloten projecten
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    mask = ((overview['con_opdrachtid'].isin(list(temp.index))) & (~overview['active_ln'].fillna(True)))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
-    # verwijder de foutmelding bij het andere project
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    # verwijder de foutmelding bij de bijbehorende projecten (mits er nog slechts een actief
+    # project is)
+    diff = list(temp[temp['active_ln'] == 1].index)
+    mask = ((overview['con_opdrachtid'].isin(diff)) & (overview['active_ln'].fillna(True)))
     overview.at[mask, 'F01'] = np.nan
     overview.at[mask, 'F02'] = np.nan
 
@@ -993,24 +1006,26 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     temp = overview[overview['F01'].notna()]
     temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
     temp = temp[temp['active_ln'] != temp['ln_id']]
-    temp = list(temp.index)
     # verwijder afgesloten projecten
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    mask = ((overview['con_opdrachtid'].isin(list(temp.index))) & (~overview['active_ln'].fillna(True)))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
-    # verwijder de foutmelding bij het andere project
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    # verwijder de foutmelding bij de bijbehorende projecten (mits er nog slechts een actief
+    # project is)
+    diff = list(temp[temp['active_ln'] == 1].index)
+    mask = ((overview['con_opdrachtid'].isin(diff)) & (overview['active_ln'].fillna(True)))
     overview.at[mask, 'F01'] = np.nan
 
     # Voor dubbele bouwplannummers
     temp = overview[overview['F02'].notna()]
     temp = temp.groupby('con_opdrachtid').agg({'ln_id': 'count', 'active_ln': lambda x: sum(x)})
     temp = temp[temp['active_ln'] != temp['ln_id']]
-    temp = list(temp.index)
     # verwijder afgesloten projecten
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (~overview['active_ln'].fillna(True)))
+    mask = ((overview['con_opdrachtid'].isin(list(temp.index))) & (~overview['active_ln'].fillna(True)))
     overview.at[mask, 'afgesloten'] = 'afgesloten'
-    # verwijder de foutmelding bij het andere project
-    mask = ((overview['con_opdrachtid'].isin(temp)) & (overview['active_ln'].fillna(True)))
+    # verwijder de foutmelding bij de bijbehorende projecten (mits er nog slechts een actief
+    # project is)
+    diff = list(temp[temp['active_ln'] == 1].index)
+    mask = ((overview['con_opdrachtid'].isin(diff)) & (overview['active_ln'].fillna(True)))
     overview.at[mask, 'F02'] = np.nan
 
     ###################################################################################################################
@@ -1054,7 +1069,8 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
         '31_35_intake': ['F01', 'F02', 'C03', 'F06', 'C08', 'C10', 'F17', 'C18'],
         '35_intake': ['F01', 'C03', 'C08'],
         '31_intake': [],
-        'VZ_ontbreekt': []
+        'VZ_ontbreekt': [],
+        '40_expenses': []
     }
 
     foutmeldingen = pd.DataFrame([])
