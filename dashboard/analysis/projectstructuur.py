@@ -1070,7 +1070,8 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
         '35_intake': ['F01', 'C03', 'C08'],
         '31_intake': [],
         'VZ_ontbreekt': [],
-        '40_expenses': []
+        '40_expenses': ['F01', 'F02', 'C03', 'F04', 'F05', 'C07',
+                           'C08', 'C11', 'F13', 'F14', 'F16']
     }
 
     foutmeldingen = pd.DataFrame([])
