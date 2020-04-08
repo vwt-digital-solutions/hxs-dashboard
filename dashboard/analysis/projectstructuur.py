@@ -207,15 +207,28 @@ class connect_vz():
         # Empty cpnr_extracted: explicit to np.nan
         df_cpnr['cpnr_extracted'] = df_cpnr['cpnr_extracted'].replace('', np.nan)
 
-        # Use group by to find the 'opdrachten' with no 'cpnr_corrected' and exactly 1 'cpnr_extracted'
-        to_find = df_cpnr.groupby('con_opdrachtid').nunique()
-        to_find = to_find[
-            (to_find['cpnr_corrected'] == 0) &
-            (to_find['cpnr_extracted'] == 1)
-        ]
+        # Find the con_objectid for which a corrected number is uploaded in the past
+        q = sa.select([czLog.parameter]).\
+            where(czLog.description == 'conobjid-cpnr').\
+            where(czLog.action == 'upload')
+        df_log = list(pd.read_sql(q, session.bind)['parameter'])
+
+        # Use group by to find the 'opdrachten' in which the objects all have the same cpnr_extracted
+        # or cpnr_corrected and add the boolean if corrected is manually uploaded.
+        to_find = df_cpnr.groupby('con_opdrachtid').agg({
+            'cpnr_corrected': ['nunique', 'first'],
+            'cpnr_extracted': ['nunique', 'first']
+        }).reset_index()
+        to_find['manual_upload'] = to_find['con_opdrachtid'].isin(df_log)
+        to_find['same'] = to_find[('cpnr_corrected', 'first')] == to_find[('cpnr_extracted', 'first')]
+        
+        # update when never manually uploaded by user, cpnr_extracted is the same for every object and 
+        # cpnr_correct is not yet the same as cpnr_extracted.
+        mask = ((~to_find['manual_upload']) & (~to_find['same']) & (to_find[('cpnr_extracted', 'nunique')] == 1))
+        to_find = to_find[mask]
 
         # Create 'upload', to update the cpnr_corrected in the database
-        upload = df_cpnr[df_cpnr['con_opdrachtid'].isin(to_find.index)]
+        upload = df_cpnr[df_cpnr['con_opdrachtid'].isin(to_find['con_opdrachtid'])]
 
         upload = upload.assign(cpnr_corrected=upload.
                                sort_values(by=['con_opdrachtid', 'cpnr_extracted'])['cpnr_extracted'].
