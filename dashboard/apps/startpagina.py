@@ -75,18 +75,20 @@ def get_body():
                     html.P(""),
                     html.P(""),
                     html.P(
-                        "Onder het tabblad 'Projectstructuur - problemen' kan worden gefilterd op problemen in de projectstructuur.",
+                        "Onder het tabblad 'Projectstructuur - problemen' \
+                            kan worden gefilterd op problemen in de projectstructuur.",
                         className="lead"),
                     html.P(
-                        """Na de selectie van een probleem komen orders, bouwplannumers en/of projecten naar voren die vervolgens opgezocht kunnen worden
+                        """Na de selectie van een probleem komen orders, bouwplannumers en/of projecten naar voren die \
+                            vervolgens opgezocht kunnen worden
                         onder het tabblad 'Projectstructuur op project'.""",
                         className="lead"),
                     html.P(
                         "Op deze pagina staat de uitleg van het probleem en de actie die ondernomen moet worden.",
                         className='lead'),
                     html.P(
-                        "Omvat de actie een aanpassing van het bouwplannummer in Connect, dan kan dit worden aangepast" +
-                        "op het tabblad 'Connect - Objectniveau'.",
+                        "Omvat de actie een aanpassing van het bouwplannummer in Connect, " +
+                        "dan kan dit worden aangepast op het tabblad 'Connect - Objectniveau'.",
                         className="lead"),
                     html.A(button(
                             "Klik hier om te beginnen",
@@ -253,8 +255,10 @@ def update_data_dashboard():
             data = get_lncpcon_data()
             overview, intake, = compute_projectstucture(data)
 
-            # 28-02-2020: Omdat de fases van LN aan het veranderen zijn, hebben we besloten de status vergelijking uit te zetten. Dit
-            # kan weer worden aangezet zodra de fases allemaal zijn uitgedacht. Dit is in overleg met Tim Keiren gedaan op 28-02.
+            # 28-02-2020: Omdat de fases van LN aan het veranderen zijn,
+            # hebben we besloten de status vergelijking uit te zetten. Dit
+            # kan weer worden aangezet zodra de fases allemaal zijn uitgedacht.
+            # Dit is in overleg met Tim Keiren gedaan op 28-02.
             # xar = xaris()
             # status_ln_cp, status_ln_con, relevante_xaris = compute_fases(data, overview, xar)
 
@@ -315,7 +319,11 @@ def update_data_dashboard():
                 update_dropdown_values(dropdown3, overview[opdracht_id].tolist(), session=session)
                 update_dropdown_values('category_dropdown', overview['categorie'].tolist(), session=session)
                 update_dropdown_values('projectstructuur_fout_dropdown', projectstructuur_fouten, session=session)
-                update_dropdown_values('dropdown_intake', intake['categorie'].drop_duplicates().tolist(), session=session)
+                update_dropdown_values(
+                    'dropdown_intake',
+                    intake['categorie'].drop_duplicates().tolist(),
+                    session=session
+                )
 
                 # Update the cleaning table
                 print(text6)
@@ -337,7 +345,8 @@ def update_data_dashboard():
                     (overview['Projectstructuur constateringen'].str.count(';') - overview['observation_count'] >= 1)
                 )]),
                 len(overview[
-                    ((overview['Projectstructuur constateringen'].str.count(';')) - (overview['observation_count']) == -1)
+                    ((overview['Projectstructuur constateringen'].str.count(';')) -
+                        (overview['observation_count']) == -1)
                 ]),
             )
             overview.drop(columns=['observation_count'], inplace=True)

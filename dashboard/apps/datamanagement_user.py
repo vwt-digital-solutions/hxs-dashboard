@@ -3,7 +3,6 @@ import pandas as pd
 
 import dash_html_components as html
 
-from apps.elements import table_styles
 from apps.elements import styles, table_styles
 from app import get_user
 from db.models import czCleaning
@@ -63,7 +62,14 @@ def update_user_table():
         with Connection('r', 'read overview: update_user_table') as session:
             overview = read(session, 'projectstructure', key=df['key'].tolist())
         if len(overview) > 0:
-            overview = overview[['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling']]
+            overview = overview[[
+                'ln_id',
+                'bpnr',
+                'con_opdrachtid',
+                'categorie',
+                'Projectstructuur constateringen',
+                'koppeling'
+            ]]
             dataframe = keys.join(df.drop('key', axis=1))
             dataframe = dataframe.merge(overview, on=['ln_id', 'bpnr', 'con_opdrachtid'])
 
@@ -96,7 +102,8 @@ def update_user_table():
                                     filtering=True,
                                     css=[{
                                         'selector': '.dash-cell div.dash-cell-value',
-                                        'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                                        'rule': 'display: inline; white-space: inherit; \
+                                            overflow: inherit; text-overflow: inherit;'
                                     }],
                                     style_data={'whiteSpace': 'normal'},
                                     style_table={'overflowX': 'scroll'},
@@ -141,7 +148,8 @@ def update_user_table():
                                 filtering=True,
                                 css=[{
                                     'selector': '.dash-cell div.dash-cell-value',
-                                    'rule': 'display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;'
+                                    'rule': 'display: inline; white-space: inherit; overflow: inherit; \
+                                        text-overflow: inherit;'
                                 }],
                                 style_data={'whiteSpace': 'normal'},
                                 style_table={'overflowX': 'scroll'},

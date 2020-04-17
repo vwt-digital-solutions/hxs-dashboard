@@ -23,10 +23,14 @@ cardbody1 = '''
     verschillende combinaties van statussen voor en de projecten binnen een bepaalde combinatie
     kunnen via deze pagina worden opgevraagd. Er zijn 4 verschillende vergelijkingen te maken:
 '''
-cardbody2 = "1.	InforLN versus Changepoint Nieuwbouw: de status van alle nieuwbouwprojecten in LN worden vergeleken met de status van de gekoppelde Changepoint nummers"
-cardbody3 = "2.	InforLN versus Changepoint Vooraanleg: de status van alle vooraanleg projecten in LN worden vergeleken met de status van de gekoppelde Changepoint nummers."
-cardbody4 = "3.	InforLN versus Connect: de statussen van alle in LN worden vergeleken met de status van de gekoppelde Connect objecten."
-cardbody5 = "4.	Xaris versus Connect: de statussen van alle projecten die voorkomen in Xaris worden vergeleken met de statussen van alle gekoppelde Connect opdrachten."
+cardbody2 = "1.	InforLN versus Changepoint Nieuwbouw: de status van alle nieuwbouwprojecten \
+    in LN worden vergeleken met de status van de gekoppelde Changepoint nummers"
+cardbody3 = "2.	InforLN versus Changepoint Vooraanleg: de status van alle vooraanleg projecten in \
+    LN worden vergeleken met de status van de gekoppelde Changepoint nummers."
+cardbody4 = "3.	InforLN versus Connect: de statussen van alle in LN worden vergeleken met de status \
+    van de gekoppelde Connect objecten."
+cardbody5 = "4.	Xaris versus Connect: de statussen van alle projecten die voorkomen in Xaris worden \
+    vergeleken met de statussen van alle gekoppelde Connect opdrachten."
 cardbody6 = '''
     Het aantal verschijningen van een bepaalde combinatie wordt weergegeven in de tabellen op de pagina.
     Door op een bepaalde combinatie te klikken, volgt onderaan een uitgebreide tabel met de desbetreffende
@@ -34,7 +38,8 @@ cardbody6 = '''
     mag komen of niet. Hierbij is de volgende mapping toegepast:
 '''
 cardbody7 = 'Groen --> Deze combinatie is correct'
-cardbody8 = 'Geel --> Deze combinatie van statussen is twijfelachtig. Per case kan het verschillen of dit correct of incorrect is'
+cardbody8 = 'Geel --> Deze combinatie van statussen is twijfelachtig. \
+    Per case kan het verschillen of dit correct of incorrect is'
 cardbody9 = 'Rood --> Deze combinatie van statussen is incorrect'
 cardbody10 = 'Blauw --> Deze combinatie kan alleen voorkomen als er een fout is gemaakt bij Vodafone Ziggo'
 cardbodyheader = 'Bepalen van de statussen:'
@@ -56,7 +61,8 @@ radio_item_options = [
     {'label': 'Xaris zonder connect: gehele historie', 'value': False},
 ]
 
-intake_options = ['InforLN_vs_ChangePoint_Nieuwbouw', 'InforLNn_vs_ChangePoint_Vooraanleg', 'InforLN_vs_Connect', 'Xaris_vs_Connect']
+intake_options = ['InforLN_vs_ChangePoint_Nieuwbouw', 'InforLNn_vs_ChangePoint_Vooraanleg',
+                  'InforLN_vs_Connect', 'Xaris_vs_Connect']
 option1 = 'InforLN_vs_ChangePoint_Nieuwbouw'
 option2 = 'InforLNn_vs_ChangePoint_Vooraanleg'
 option3 = 'InforLN_vs_Connect'
@@ -258,20 +264,26 @@ def get_status_df(intake_value, selected_cells, fm, xaris_df=None):
         df_out = df2[(df2['cpfase'] == df_['cpfase'][selected_cells[0]['row']]) &
                      (df2['categorie'] == '34_nieuwbouw') & (df2['lnfase'] == selected_cells[0]['column_id'])]
         df_out = df_out[df_out1]
-        type_fout = '(lnfase = ' + selected_cells[0]['column_id'] + ', cpfase = ' + df_['cpfase'][selected_cells[0]['row']] + ')'
+        type_fout = '(lnfase = ' + selected_cells[0]['column_id'] + \
+                    ', cpfase = ' + df_['cpfase'][selected_cells[0]['row']] + ')'
     elif intake_value == option2:
         df_ = pd.DataFrame(fm['types_2_unique'])
         df2 = pd.DataFrame(fm['status_1'])
         df_out = df2[(df2['cpfase'] == df_['cpfase'][selected_cells[0]['row']]) &
                      (df2['categorie'] == '34_vooraanleg') & (df2['lnfase'] == selected_cells[0]['column_id'])]
         df_out = df_out[df_out1]
-        type_fout = '(lnfase = ' + selected_cells[0]['column_id'] + ', cpfase = ' + df_['cpfase'][selected_cells[0]['row']] + ')'
+        type_fout = '(lnfase = ' + \
+                    selected_cells[0]['column_id'] + \
+                    ', cpfase = ' + \
+                    df_['cpfase'][selected_cells[0]['row']] + ')'
     elif intake_value == option3:
         df_ = pd.DataFrame(fm['types_3_unique'])
         df2 = pd.DataFrame(fm['status_2'])
         idx = selected_cells[0]['row']
-        df_out = df2[(df2['con_request'] == df_['con_request'].iloc[idx]) & (df2['con_object'] == df_['con_object'].iloc[idx]) &
-                     (df2['con_payment'] == df_['con_payment'].iloc[idx]) & (df2['lnfase'] == selected_cells[0]['column_id'])]
+        df_out = df2[(df2['con_request'] == df_['con_request'].iloc[idx]) &
+                     (df2['con_object'] == df_['con_object'].iloc[idx]) &
+                     (df2['con_payment'] == df_['con_payment'].iloc[idx]) &
+                     (df2['lnfase'] == selected_cells[0]['column_id'])]
         type_fout = '(confase: ' + df_['con_request'].iloc[idx] + \
                     ' + ' + df_['con_object'].iloc[idx] + ' + ' + df_['con_payment'].iloc[idx] + \
                     ', lnfase: ' + selected_cells[0]['column_id'] + ')'
@@ -279,8 +291,12 @@ def get_status_df(intake_value, selected_cells, fm, xaris_df=None):
         df_out['aantal_conobj_totaal'] = df_out['aantal_conobj_totaal'].round(0)
         df_out = df_out.rename(columns={'aantal_conobj': 'aantal_conobj_status'})
         df_out = df_out[df_out2]
-        type_fout = '(lnfase = ' + selected_cells[0]['column_id'] + ', con_request = ' + df_['con_request'].iloc[idx] + \
-                    ', con_object = ' + df_['con_object'].iloc[idx] + ', con_payment = ' + df_['con_payment'].iloc[idx] + ')'
+        type_fout = '(lnfase = ' + \
+                    selected_cells[0]['column_id'] + \
+                    ', con_request = ' + \
+                    df_['con_request'].iloc[idx] + \
+                    ', con_object = ' + df_['con_object'].iloc[idx] + \
+                    ', con_payment = ' + df_['con_payment'].iloc[idx] + ')'
     elif intake_value == option4:
         df_ = pd.DataFrame(fm['types_4_unique'])
         df2 = pd.DataFrame(fm['status_4'])
@@ -614,7 +630,8 @@ def status_download_file(excel_writer, intake_value, selected_cells, hist):
             AND versionEnd IS NULL
             AND parentKindKey IN :ids
             ''')
-            cp_coupling = pd.read_sql(cp_keys_q, session.bind, params={'ids': df_out['bpnr'].fillna('').drop_duplicates().tolist()})
+            cp_coupling = pd.read_sql(
+                cp_keys_q, session.bind, params={'ids': df_out['bpnr'].fillna('').drop_duplicates().tolist()})
             cp = read(
                 session,
                 sourceTag=sourcetag2,

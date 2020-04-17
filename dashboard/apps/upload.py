@@ -84,7 +84,8 @@ def get_body():
                             """
                             Op deze pagina kunnen bronbestanden voor ChangePoint worden geüpload.
                             Deze bestanden worden opgenomen in het dashboard.
-                            De data wordt verwerkt door de Operational Datahub en daardoor zal de dataverwerking een paar minuutjes duren.
+                            De data wordt verwerkt door de Operational Datahub en daardoor \
+                                zal de dataverwerking een paar minuutjes duren.
                             Na een bevestiging dat de upload is geslaagd kun je deze pagina verlaten.
 
                             Bij het uploaden worden een aantal kolommen verwacht.

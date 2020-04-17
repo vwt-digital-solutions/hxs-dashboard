@@ -2,7 +2,6 @@ import dash_table
 import pandas as pd
 import time
 import traceback
-import traceback
 import sqlalchemy as sa
 import dash_core_components as dcc
 import dash_html_components as html
@@ -32,7 +31,8 @@ def get_body():
                 dbc.Collapse(
                     dbc.Card(
                         dbc.CardBody("""
-                        In de bovenstaande lijst kun je alle beschikbare ChangePoint bouwplannummers van aannemer veranderen.
+                        In de bovenstaande lijst kun je alle beschikbare ChangePoint \
+                        bouwplannummers van aannemer veranderen.
                         Er zijn drie smaken: Connect-Z Utrecht, Connect-Z Montfoort of Others.
                         Klik op 'veranderen' om de verandering op te slaan.
                         """),
@@ -166,15 +166,17 @@ def choose_cpnr(value):
         where(czHierarchy.parentKind == 'contractor').\
         where(czHierarchy.kind == 'cpnr').\
         where(czHierarchy.versionEnd.is_(None))
-        
+
     with Connection('r', 'get cpnrs') as session:
         cpnr_dropdown = pd.read_sql(q_cpnr_all, session.bind)
 
         if value == 'empty':
             with Connection('r', 'get contractors') as session:
                 cpnr_contractor = pd.read_sql(q_cpnr, session.bind)
-            cpnr_dropdown = cpnr_dropdown.merge(cpnr_contractor, how='left', left_on='parentKindKey', right_on='kindKey', suffixes=['', '_'])
-            cpnr_dropdown = cpnr_dropdown[((cpnr_dropdown['parentKindKey_'].isna()) | (cpnr_dropdown['parentKindKey_'].isin(['', 'Connect-Z'])))]
+            cpnr_dropdown = cpnr_dropdown.merge(
+                cpnr_contractor, how='left', left_on='parentKindKey', right_on='kindKey', suffixes=['', '_'])
+            cpnr_dropdown = cpnr_dropdown[((cpnr_dropdown['parentKindKey_'].isna()) |
+                                           (cpnr_dropdown['parentKindKey_'].isin(['', 'Connect-Z'])))]
 
     options = [{'label': el['parentKindKey'], 'value': el['kindKey'] + '|' + el['parentKindKey']}
                for el in cpnr_dropdown.to_dict(orient='records')]
@@ -202,10 +204,10 @@ def choose_cpnr(value):
 )
 def cp_page_content(value, ts_button, contractor, plaats_invul, plaats_invul_ph):
     now = int(str(int(time.time()))[:10])
-    
-    if ts_button != None:
+
+    if ts_button is not None:
         ts_button = int(str(ts_button)[:10])
-    elif ts_button == None:
+    elif ts_button is None:
         ts_button = 1
 
     if value is None:
@@ -229,7 +231,8 @@ def cp_page_content(value, ts_button, contractor, plaats_invul, plaats_invul_ph)
             df = read(session, SOURCETAG, key=value[0], measure=measures)
 
         try:
-            q_select = sa.select([czHierarchy.kindKey, czHierarchy.kind, czHierarchy.parentKindKey, czHierarchy.parentKind]).\
+            q_select = sa.select(
+                [czHierarchy.kindKey, czHierarchy.kind, czHierarchy.parentKindKey, czHierarchy.parentKind]).\
                 where(czHierarchy.versionEnd.is_(None)).\
                 where(czHierarchy.kind == 'cpnr').\
                 where(sa.or_(czHierarchy.parentKind == 'contractor',
@@ -247,7 +250,7 @@ def cp_page_content(value, ts_button, contractor, plaats_invul, plaats_invul_ph)
                     dataframe = dataframe.append(pd.DataFrame(
                         [[value[1], 'cpnr', '', 'plaats']], columns=list(dataframe)), ignore_index=True)
                 old_place = dataframe.loc[dataframe['parentKind'] == 'plaats', 'parentKindKey'].values[0]
-                
+
                 # If button is pressed
                 if (ts_button >= (now-1)) & ((old_contractor != contractor) | ((old_place) != plaats_invul)):
                     dataframe.at[dataframe['parentKind'] == 'plaats', 'parentKindKey'] = plaats_invul
@@ -320,10 +323,10 @@ def cp_page_content(value, ts_button, contractor, plaats_invul, plaats_invul_ph)
                         style_cell=table_styles['cell']['action'],
                         style_cell_conditional=table_styles['cell']['conditional'],
                     ))
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             content = [html.H4('An error occured, please retry')]
-            
+
     return content, new_value, options, new_value_place, ''
 
 

@@ -156,7 +156,8 @@ class inforln():
         For example, the length-8 project numbers all start with either `SJAB` or `TEMP`.
         All length-9 project numbers (in our initial data dumps) are fully numeric and can be retained."""
 
-        # Filter only lenth-9 and alphanumeric project codes. This check can be extended with self.df_proj['Project'].str.isnumeric()
+        # Filter only lenth-9 and alphanumeric project codes.
+        # This check can be extended with self.df_proj['Project'].str.isnumeric()
         mask = self.df_proj['ln_id'].str.len() == 9
         self.df_proj = self.df_proj.loc[mask]
 
@@ -221,8 +222,8 @@ class connect_vz():
         }).reset_index()
         to_find['manual_upload'] = to_find['con_opdrachtid'].isin(df_log)
         to_find['same'] = to_find[('cpnr_corrected', 'first')] == to_find[('cpnr_extracted', 'first')]
-        
-        # update when never manually uploaded by user, cpnr_extracted is the same for every object and 
+
+        # update when never manually uploaded by user, cpnr_extracted is the same for every object and
         # cpnr_correct is not yet the same as cpnr_extracted.
         mask = ((~to_find['manual_upload']) & (~to_find['same']) & (to_find[('cpnr_extracted', 'nunique')] == 1))
         to_find = to_find[mask]
@@ -297,7 +298,8 @@ class connect_vz():
         if True (default) exclude them from the set
         """
         # Pas filters toe op originele set
-        former_cz_area = self.df['object_pc'].str[:4].isin(pc4codes) & self.df['contractor_area'].str.contains('Connect-Z')
+        former_cz_area = self.df['object_pc'].str[:4].isin(pc4codes) & \
+            self.df['contractor_area'].str.contains('Connect-Z')
         current_hxs_area = self.df['contractor_area'].str.contains('VolkerWessels')
         area = former_cz_area | current_hxs_area
         aanleg = self.df['order_type'].isin(
@@ -365,7 +367,8 @@ class xaris():
         self.df['juist_nummer'] = self.df['Aanvraagnummer'].str.extract(
             r'(\d{10}|nhl\d{2}\.\d{5}|NHL\d{2}\.\d{5})')
 
-        # als de kolom genaamd 'Kabel' de string 'Ziggo verv' bevat, en er is niet nog een andere Ziggo aanwezig. Dan is dit item vervallen
+        # als de kolom genaamd 'Kabel' de string 'Ziggo verv' bevat,
+        # en er is niet nog een andere Ziggo aanwezig. Dan is dit item vervallen
         self.df['vervallen'] = ((self.df['Kabel'].str.count('Ziggo verv') > 0) & (
             self.df['Kabel'].str.count('Ziggo') <= 1))
         # alleen als alle werkstromen een 'Datum gereed' hebben, dan is de Xaris gereed.
@@ -759,7 +762,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     overview = overview[~mask]
 
     # enkele nummers die al wel in een combinatie voorkomen eruit halen. Het kan wel zo zijn dat
-    # een bpnr in intake staat en al voorkomt in een combinatie als de combinatie een geen 31 of 34 
+    # een bpnr in intake staat en al voorkomt in een combinatie als de combinatie een geen 31 of 34
     # nummer is. Daarom hier alleen kijken naar LN en Con
     overview['d_ln'] = overview['ln_id'].duplicated(keep=False)
     overview['d_con'] = overview['con_opdrachtid'].duplicated(keep=False)
@@ -856,7 +859,8 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             (overview['con_opdrachtid'].notna()) &
             (overview['type_hierarchy'] == 'Enkelvoudig project'))
     overview.at[mask, 'F04'] = \
-        'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
+        'F04_In Connect is deze order gekoppeld aan een ChangePoint, \
+            maar staat geregisteerd als een enkelvoudig project'
 
     # LNnr is niet actief
     mask = ((~overview['active_ln'].fillna(True)) | (overview['ln_id'].isin(list(ln.df_nonActive['ln_id'].unique()))))
@@ -923,9 +927,11 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # Hoofdproject en deelproject hebben een ander bouwplannummer
     mask = overview['ln_id'].fillna('').str.startswith('31')
-    temp = overview[mask][['ln_id', 'bpnr']].rename(columns={'ln_id': 'ln_id_hoofdproject', 'bpnr': 'bpnr_hoofdproject'})
-    temp = overview[overview['main_project'].notna()].merge(temp, left_on='main_project', right_on='ln_id_hoofdproject', how='left')
-    mask = ((temp['bpnr'] != temp['bpnr_hoofdproject']) & (temp['active_ln'] == True))
+    temp = overview[mask][['ln_id', 'bpnr']].rename(
+        columns={'ln_id': 'ln_id_hoofdproject', 'bpnr': 'bpnr_hoofdproject'})
+    temp = overview[overview['main_project'].notna()].merge(
+        temp, left_on='main_project', right_on='ln_id_hoofdproject', how='left')
+    mask = ((temp['bpnr'] != temp['bpnr_hoofdproject']) & (temp['active_ln'].fillna(False)))
     temp = list(temp[mask]['ln_id'].unique())
     mask = overview['ln_id'].isin(temp)
     overview.at[mask, 'F15'] = 'F15_Hoofdproject en deelproject hebben een ander bouwplannummer'
@@ -999,7 +1005,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
 
     # Connect opdrachten die over meerdere bouwplannen of LN vallen, maar waarvan er een LN project al is afgerond en
     # er een nieuwe is opgestart. Dit LN project mag eruitgehaald worden
-    
+
     # Voor dubble bouwplan en LN project
     mask = ((overview['F01'].notna()) & (overview['F02'].notna()))
     temp = overview[mask]
@@ -1054,7 +1060,8 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     # 'F01' = 'F01_Deze Connect opdracht valt over meerdere bouwplannummers'
     # 'F02' = 'F02_Dit connectid bevindt zich in meerdere LN projecten'
     # 'C03' = 'C03_Alle Connect objecten zijn afgerekend maar de Connect aanvraag is niet gereed'
-    # 'F04' = 'F04_In Connect is deze order gekoppeld aan een ChangePoint, maar staat geregisteerd als een enkelvoudig project'
+    # 'F04' = 'F04_In Connect is deze order gekoppeld aan een ChangePoint,
+    # maar staat geregisteerd als een enkelvoudig project'
     # 'F05' = 'F05_LNnr is niet actief'
     # 'F06' = 'F06_CP nummer is niet als nieuwbouwproject geregistreerd in CP'
     # 'C07' = 'C07_Connect opdracht is niet als actief aanleg project geregistreerd in Connect'
@@ -1084,7 +1091,7 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
         '31_intake': [],
         'VZ_ontbreekt': [],
         '40_expenses': ['F01', 'F02', 'C03', 'F04', 'F05', 'C07',
-                           'C08', 'F13', 'F14', 'F16']
+                        'C08', 'F13', 'F14', 'F16']
     }
 
     foutmeldingen = pd.DataFrame([])
@@ -1098,7 +1105,14 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
     ###################################################################################################################
     # Merge foutmeldingen en bereid het df voor
     ###################################################################################################################
-    overview = overview[['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling']]
+    overview = overview[[
+        'ln_id',
+        'bpnr',
+        'con_opdrachtid',
+        'categorie',
+        'Projectstructuur constateringen',
+        'koppeling'
+    ]]
     mask = overview['Projectstructuur constateringen'].fillna('').str.startswith(';')
     overview.at[mask, 'Projectstructuur constateringen'] = overview[mask]['Projectstructuur constateringen'].str[2:]
 
@@ -1132,9 +1146,8 @@ def compute_projectstucture(lncpcon_data=None, check_sets=False):
             sets['bpnr'], sets['bpnr'] - set(overview['bpnr'].tolist())
         ))
 
-        print('Connect: too many in list; set(list) - set(con) = {}\nConnect: missing in set; set(con) - set(list) = {}'.format(
-            set(overview['con_opdrachtid'].tolist(
-            )) - sets['con_opdrachtid'], sets['con_opdrachtid'] - set(overview['con_opdrachtid'].tolist())
-        ))
+        print('Connect: too many in list; set(list) - set(con) = {}\nConnect: missing in set; set(con) - set(list) = {}'
+              .format(set(overview['con_opdrachtid'].tolist(
+              )) - sets['con_opdrachtid'], sets['con_opdrachtid'] - set(overview['con_opdrachtid'].tolist())))
 
     return overview[to_export], intake

@@ -24,7 +24,15 @@ import sqlalchemy as sa
 system_tab = OrderedDict([
     ('ln', ['LN project', 'ln', 'InforLN', 'ln_table', 'dropdown_ln', 'ln_id', 'alert_clean_ln']),
     ('cp', ['CP nummer', 'cp', 'ChangePoint', 'cp_table', 'dropdown_cp', 'bpnr', 'alert_clean_cp']),
-    ('connect', ['Connect Opdracht ID', 'connect', 'Connect', 'connect_table', 'dropdown1_con', 'con_opdrachtid', 'alert_clean_con']),
+    ('connect', [
+        'Connect Opdracht ID',
+        'connect',
+        'Connect',
+        'connect_table',
+        'dropdown1_con',
+        'con_opdrachtid',
+        'alert_clean_con'
+    ]),
 ])
 
 
@@ -336,7 +344,7 @@ def get_comments(df):
 
 
 def add_comment(kind, kindKey, comment):
-    
+
     if comment is None:
         color = 'warning'
         message = 'Er is geen opmerking ingevoerd'
@@ -362,7 +370,7 @@ def add_comment(kind, kindKey, comment):
                 kindKey
             )
             color = 'success'
-        except Exception as e:
+        except Exception:
             color = 'danger'
             message = 'Foutmelding, opmerking toevoegen mislukt'
     else:
@@ -551,7 +559,7 @@ def update_ln_table(
     #     click_ts_ln = str(click_ts_ln)[:10]
     # elif click_ts_ln == None:
     #     click_ts_ln = 1
-    
+
     # if click_ts_comment_ln != None:
     #     click_ts_comment_ln = str(click_ts_comment_ln)[:10]
     # elif click_ts_comment_ln == None:
@@ -561,7 +569,7 @@ def update_ln_table(
     #     click_ts_cp = str(click_ts_cp)[:10]
     # elif click_ts_cp == None:
     #     click_ts_cp = 1
-    
+
     # if click_ts_comment_cp != None:
     #     click_ts_comment_cp = str(click_ts_comment_cp)[:10]
     # elif click_ts_comment_cp == None:
@@ -571,7 +579,7 @@ def update_ln_table(
     #     click_ts_con = str(click_ts_con)[:10]
     # elif click_ts_con == None:
     #     click_ts_con = 1
-    
+
     # if click_ts_comment_con != None:
     #     click_ts_comment_con = str(click_ts_comment_con)[:10]
     # elif click_ts_comment_con == None:
@@ -647,6 +655,7 @@ def update_ln_table(
         update_con,
         comment['ln'], comment['cp'], comment['con'],
     ]
+
 
 def transform_timestamp(ts):
     if ts is None:

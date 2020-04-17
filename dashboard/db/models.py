@@ -1,9 +1,5 @@
-import pandas as pd
-import numpy as np
 import sqlalchemy as sa
-
 from app import get_user
-from datetime import datetime as dt
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -43,7 +39,8 @@ class czHierarchy(Base):
                              chunksize].to_dict(orient='records')
             q_insert = sa.sql.expression.insert(czHierarchy, values=insert)
             session.execute(q_insert)
-            # session.add_all([czHierarchy(r['kind'], r['kindKey'], r['parentKind'], r['parentKindKey']) for r in insert])
+            # session.add_all(
+            #     [czHierarchy(r['kind'], r['kindKey'], r['parentKind'], r['parentKindKey']) for r in insert])
             session.flush()
             i += 1
         print('czHierarcy - flushed')
@@ -126,7 +123,7 @@ class czComment(Base):
         self.kind = kind
         self.kindKey = kindKey
         self.comment = comment
-        self.user = user
+        # self.user = user
 
     def insert(insert, session):
         insert = add_user(insert)
