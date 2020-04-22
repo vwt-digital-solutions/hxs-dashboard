@@ -1,5 +1,3 @@
-from _plotly_future_ import v4_subplots
-
 import os
 import io
 import flask
@@ -52,7 +50,13 @@ download_config = {
     'problem': {
         'col_order': ['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling'],
         'col_order2': [
-            'ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling', 'bewerkingsstatus'
+            'ln_id',
+            'bpnr',
+            'con_opdrachtid',
+            'categorie',
+            'Projectstructuur constateringen',
+            'koppeling',
+            'bewerkingsstatus'
         ],
     }
 }

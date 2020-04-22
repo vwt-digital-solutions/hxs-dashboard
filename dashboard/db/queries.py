@@ -4,9 +4,8 @@ import sqlalchemy as sa
 
 from datetime import datetime as dt
 from connection import Connection
-from analysis.connectz import inforln, connect_vz
-from sqlalchemy.ext.declarative import declarative_base
-from db.models import *
+from db.models import (czHierarchy, czLog, czCleaning, czFilterOptions,
+                       czImportKeys, czImportMeasureValues, czSubscriptions)
 
 
 def get_corrections_connect(con):
@@ -199,11 +198,10 @@ def update_cp_couples(cp, kind, add_new=False):
         # Only import the ones that are not already in the database
         with Connection('w', 'dataupdate cpnr - contractor') as session:
             # Haal op wat er nog beschikbaar is
-            q = '''SELECT kindKey FROM czHierarchy
-                            WHERE versionEnd is NULL
-                            AND kind = 'cpnr'
-                            AND parentKind = '{}'
-                            '''.format(kind)
+            q = sa.select(czHierarchy.kindKey).\
+                where(czHierarchy.versionEnd.is_(None)).\
+                where(czHierarchy.kind == 'cpnr').\
+                where(czHierarchy.parentKind == kind)
 
             new_bpnr = pd.read_sql(q, session.bind)
 
@@ -372,23 +370,24 @@ def compare_and_insert(session, df, sourceTag, sourceKey='sourceKey', valueDate=
                 versionManagement=False,
             )
 
+
 def insert(session, data_dict, sourceTag, sourceKey='sourceKey', valueDate=None, ts=None, versionManagement=True):
     if ts is None:
         ts = dt.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     sourceKey = data_dict.pop(sourceKey)
     sourceId = data_dict.pop('sourceId', 0)
 
     if valueDate is None:
         valueDate = ts
-    
+
     if versionManagement:
         # Update statement on czImportKeys
         q_update = sa.sql.expression.update(czImportKeys).\
             where(czImportKeys.sourceKey == sourceKey).\
             where(czImportKeys.sourceTag == sourceTag).\
-            where(czImportKeys.versionEnd == None).\
-            values(versionEnd = ts)
+            where(czImportKeys.versionEnd is None).\
+            values(versionEnd=ts)
 
         session.execute(q_update)
         session.flush()
@@ -406,12 +405,12 @@ def insert(session, data_dict, sourceTag, sourceKey='sourceKey', valueDate=None,
 
     # Create dict containing the data for import
     data = dict(
-        importId = keys_insert.importId,
-        sourceKey = sourceKey,
-        sourceId = sourceId,
-        valueDate = valueDate,
+        importId=keys_insert.importId,
+        sourceKey=sourceKey,
+        sourceId=sourceId,
+        valueDate=valueDate,
         )
-    
+
     insert_values = []
     for measure, value in data_dict.items():
         if (value != '') and (value is not None) and (value is not np.nan):
@@ -421,12 +420,13 @@ def insert(session, data_dict, sourceTag, sourceKey='sourceKey', valueDate=None,
                     value=value,
                 )
                 }
-            ) 
+            )
 
     # Insert data into czImportMeasureValues
     q_insert = sa.sql.expression.insert(czImportMeasureValues, values=insert_values)
     session.execute(q_insert)
     session.flush()
+
 
 def read(session, sourceTag=None, key=[], measure=[], ts=None, stagingSourceTag=None):
     # Keys in list
@@ -511,7 +511,14 @@ def read(session, sourceTag=None, key=[], measure=[], ts=None, stagingSourceTag=
 
         # sourceTag specific additions:
         cols = {
-            'projectstructure': ['ln_id', 'bpnr', 'con_opdrachtid', 'categorie', 'Projectstructuur constateringen', 'koppeling'],
+            'projectstructure': [
+                'ln_id',
+                'bpnr',
+                'con_opdrachtid',
+                'categorie',
+                'Projectstructuur constateringen',
+                'koppeling'
+            ],
         }
         to_add = cols.get(sourceTag, None)
         if to_add is not None:

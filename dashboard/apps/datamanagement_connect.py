@@ -28,17 +28,22 @@ def get_body():
                 dbc.Collapse(
                     dbc.Card(
                         dbc.CardBody("""
-                        In de tabel hiernaast is voor alle objecten binnen een Connect opdracht het Bouwplannummer weergegeven.
-                        In de kolom 'con_opdrachtid' staat het opdrachtnummer aangegeven, in 'con_objectid' het objectnummer.
-                        De kolom 'cpnr_extracted' geeft aan welk ChangePoint nummer er is bepaald uit het veld 'Bouwplannummer' van Connect.
-                        De kolom 'cpnr_corrected' geeft aan welk ChangePoint nummer er op dit moment wordt gebruikt in het bepalen van de projectstructuur.
+                        In de tabel hiernaast is voor alle objecten binnen een \
+                        Connect opdracht het Bouwplannummer weergegeven.
+                        In de kolom 'con_opdrachtid' staat het opdrachtnummer aangegeven, \
+                        in 'con_objectid' het objectnummer.
+                        De kolom 'cpnr_extracted' geeft aan welk ChangePoint nummer er is \
+                        bepaald uit het veld 'Bouwplannummer' van Connect.
+                        De kolom 'cpnr_corrected' geeft aan welk ChangePoint nummer er op dit moment wordt gebruikt in \
+                        het bepalen van de projectstructuur.
 
                         Het kan zijn dat er een onjuist bouwplannummer aan een Connect object is verbonden.
                         Deze kun je wijzigen door het juiste bouwplannummer up te loaden.
                         De Connect order kun je downloaden met de knop 'Download Connect opdracht xxx'.
                         De excel die wordt gedownload kun je aanpassen.
                         Alleen aanpassingen in de gele kolom ('cpnr_corrected') worden opgenomen in de database.
-                        Als je je aanpassingen hebt gemaakt, sla je het bestand op en load je het up via de knop 'Upload correctie Connect'.
+                        Als je je aanpassingen hebt gemaakt, \
+                        sla je het bestand op en load je het up via de knop 'Upload correctie Connect'.
                         """),
                         style={'background-color': site_colors['grey20']},
                     ),
@@ -54,7 +59,6 @@ def get_body():
         where(czHierarchy.versionEnd.is_(None)).distinct()
     with Connection('r', 'read_conids') as session:
         con_ids_dropdown = [r for r, in session.execute(q_conids)]
-    
 
     # Objects
     button_upload = dcc.Upload(
@@ -251,17 +255,21 @@ def parse_con_upload(contents, filename, session):
         db_check = pd.read_sql(q_check, session.bind)
 
         if len(db_check) != len(df):
-            return "Het aantal gegeven {}objecten binnen de {}opdracht komt niet overeen met de huidige situatie".format(
-                SOURCETAG,
-                SOURCETAG
-            )
+            return "Het aantal gegeven {}objecten binnen de {}opdracht komt niet overeen met de huidige situatie". \
+                format(
+                    SOURCETAG,
+                    SOURCETAG
+                )
 
         # Controleer of de objecten gelijk zijn
         if len(set(db_check['kindKey']) & set(df['con_objectid'])) != len(db_check):
-            return "De {}objecten in de upload komen niet overeen met de objecten in de database. Download {}opdracht {} opnieuw en vul de juiste waarden in.".format(
-                SOURCETAG,
-                SOURCETAG,
-                value)
+            return "De {}objecten in de upload komen niet overeen met de objecten in de database. \
+                Download {}opdracht {} opnieuw en vul de juiste waarden in.". \
+                    format(
+                        SOURCETAG,
+                        SOURCETAG,
+                        value
+                    )
 
         return df
 
@@ -313,7 +321,7 @@ def upload_con(con_dropdown_value, contents, filename):
     table = None
     if con_dropdown_value != '':
         dataframe = get_con_df(con_dropdown_value)
-        dataframe['cpnr_corrected'].replace('','<empty>', inplace=True)
+        dataframe['cpnr_corrected'].replace('', '<empty>', inplace=True)
         dataframe['cpnr_corrected'].fillna('deleted', inplace=True)
 
         table = dash_table.DataTable(

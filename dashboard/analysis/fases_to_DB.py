@@ -31,7 +31,8 @@ def compute_fases(lncpcon_data, overview, xar):
             df = df.merge(con_afr_fase, on=con_afr_fase.columns[0], how='left').drop(con_afr_fase.columns[0], axis=1)
         return df.replace('', np.nan)
 
-    # Fase check waardering file geleverd vanuit Connect-Z, bevat mapping ln, cp en con en waarderingen ln vs cp en lv vs connect
+    # Fase check waardering file geleverd vanuit Connect-Z, bevat mapping ln,
+    # cp en con en waarderingen ln vs cp en lv vs connect
     ln_fase = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='ln').replace(np.nan, '')
     ln_fase['ln_fase'] = ln_fase['ln_fase'].str[:3].astype(str)
     cp_fase = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='cp').replace(np.nan, '')
@@ -40,7 +41,10 @@ def compute_fases(lncpcon_data, overview, xar):
     con_obj_fase = utils.download_as_dataframe(
         config.tmp_bucket, config.files['fases'], sheet_name='con_objectstatus').replace(np.nan, '')
     con_afr_fase = utils.download_as_dataframe(
-        config.tmp_bucket, config.files['fases'], sheet_name='con_afrekenstatus').replace(np.nan, '').replace('[empty]', '')
+        config.tmp_bucket,
+        config.files['fases'],
+        sheet_name='con_afrekenstatus'
+    ).replace(np.nan, '').replace('[empty]', '')
     con_cols = ['con_request', 'con_object', 'con_payment']
 
     LNvsCP = utils.download_as_dataframe(config.tmp_bucket, config.files['fases'], sheet_name='ln_vs_cp')
@@ -57,9 +61,11 @@ def compute_fases(lncpcon_data, overview, xar):
     # Connect fase -- combineren van connect met overview
     con_fases_correct = fix_fases(connect, con=True)
     connect_fase = con_fases_correct[['con_opdrachtid', 'con_objectid'] + con_cols].fillna('')
-    connect_tot = connect_fase.groupby(['con_opdrachtid'])['con_objectid'].count().reset_index().rename(columns={'con_objectid': 'totaal'})
+    connect_tot = connect_fase.groupby(['con_opdrachtid'])['con_objectid'].count().reset_index().rename(
+        columns={'con_objectid': 'totaal'})
     connect_fase = connect_fase.groupby(
-        ['con_opdrachtid'] + con_cols)['con_objectid'].count().reset_index().rename(columns={'con_objectid': 'aantal_conobj'})
+        ['con_opdrachtid'] + con_cols)['con_objectid'].count().reset_index(). \
+        rename(columns={'con_objectid': 'aantal_conobj'})
     connect_fase = connect_fase.merge(connect_tot, on='con_opdrachtid').reset_index(drop=True)
     connect_fase.at[:, 'verhouding'] = connect_fase['aantal_conobj'] / connect_fase['totaal']
     connect_all = connect_fase
@@ -82,10 +88,14 @@ def compute_fases(lncpcon_data, overview, xar):
     ln_vs_cp_al = ln_vs_cp[ln_vs_cp['categorie'] == '34_vooraanleg']
 
     status_ln_cp_nb = pd.merge(
-        ln_vs_cp_nb, LNvsCP[['lnfase', 'cpfase', 'nieuwbouw']], how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
+        ln_vs_cp_nb,
+        LNvsCP[['lnfase', 'cpfase', 'nieuwbouw']],
+        how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
     status_ln_cp_nb = status_ln_cp_nb.rename(columns={'nieuwbouw': 'status'})
     status_ln_cp_al = pd.merge(
-        ln_vs_cp_al, LNvsCP[['lnfase', 'cpfase', 'vooraanleg']], how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
+        ln_vs_cp_al,
+        LNvsCP[['lnfase', 'cpfase', 'vooraanleg']],
+        how='left', left_on=['lnfase', 'cpfase'], right_on=['lnfase', 'cpfase'])
     status_ln_cp_al = status_ln_cp_al.rename(columns={'vooraanleg': 'status'})
     status_ln_cp = pd.concat([status_ln_cp_nb, status_ln_cp_al], sort=True).reset_index(drop=True)
     status_ln_cp = status_ln_cp[['ln_id', 'bpnr', 'lnfase', 'cpfase', 'categorie', 'status']]

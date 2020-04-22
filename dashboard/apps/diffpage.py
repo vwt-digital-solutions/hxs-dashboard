@@ -91,7 +91,8 @@ def get_body():
                 style=styles['graph_page'],
         ),
         html.Div([
-            'Enkele klik op een melding in de legenda om hem te selecteren of te deselecteren, dubbelklik op een melding in de legenda om deze als enige weer te geven.',
+            'Enkele klik op een melding in de legenda om hem te selecteren of te deselecteren, \
+                dubbelklik op een melding in de legenda om deze als enige weer te geven.',
             html.Div(
                 id='diff_download_button',
             )],

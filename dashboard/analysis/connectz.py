@@ -155,7 +155,7 @@ class inforln(connect_vz):
             try:
                 self.df_hist_orig = pd.read_excel(os.path.join(path, file), sheet_name="ProjectInforLN - Fase historie")
                 self.df_hist = self.df_hist_orig.copy()
-            except Exception:
+            except TypeError:
                 pass
 
     def to_pickle(self, name):

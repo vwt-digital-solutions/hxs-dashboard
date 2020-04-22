@@ -3,7 +3,6 @@ import numpy as np
 
 from connection import Connection
 from db.queries import read
-from copy import copy
 
 
 def fase_check():
@@ -15,28 +14,45 @@ def fase_check():
     # Genereren van een lijst van foutmeldingen voor ln-cp (nieuwbouw en vooraanleg) met status en totaal
     status_ln_cp['totaal'] = 1
     status_ln_cp_nb = status_ln_cp[status_ln_cp['categorie'] == '34_nieuwbouw']
-    types_fout_cp_nb = status_ln_cp_nb.pivot_table(index=['lnfase', 'cpfase', 'status'], aggfunc=np.sum, values=['totaal'])
+    types_fout_cp_nb = status_ln_cp_nb.pivot_table(
+        index=['lnfase', 'cpfase', 'status'],
+        aggfunc=np.sum,
+        values=['totaal']
+    )
     types_fout_cp_nb = pd.DataFrame(types_fout_cp_nb.to_records())
 
     status_ln_cp_al = status_ln_cp[status_ln_cp['categorie'] == '34_vooraanleg']
-    types_fout_cp_al = status_ln_cp_al.pivot_table(index=['lnfase', 'cpfase', 'status'], aggfunc=np.sum, values=['totaal'])
+    types_fout_cp_al = status_ln_cp_al.pivot_table(
+        index=['lnfase', 'cpfase', 'status'],
+        aggfunc=np.sum,
+        values=['totaal']
+    )
     types_fout_cp_al = pd.DataFrame(types_fout_cp_al.to_records())
 
     # Genereren van een lijst van foutmeldingen voor ln-connect met status en totaal
     status_ln_con['totaal'] = 1
-    types_fout_con = status_ln_con.pivot_table(index=['con_request', 'con_object', 'con_payment', 'lnfase', 'status'], aggfunc=np.sum, values=['totaal'])
+    types_fout_con = status_ln_con.pivot_table(
+        index=['con_request', 'con_object', 'con_payment', 'lnfase', 'status'],
+        aggfunc=np.sum,
+        values=['totaal']
+    )
     types_fout_con = pd.DataFrame(types_fout_con.to_records())
 
-    # Genereren van pivot tabel voor status pagina met totalen (df_types_) en statussen (df_types_status_), 1: ln-cp-nb, 2: ln-cp-al, 3: ln-connect
+    # Genereren van pivot tabel voor status pagina met totalen (df_types_) en statussen
+    # (df_types_status_), 1: ln-cp-nb, 2: ln-cp-al, 3: ln-connect
     indexer = 'cpfase'
     df_types_1_ = types_fout_cp_nb.pivot_table(index=indexer, columns='lnfase', values='totaal').fillna(0).reset_index()
-    df_types_1_status = types_fout_cp_nb.pivot_table(index=indexer, columns='lnfase', values='status').fillna(1).reset_index()
+    df_types_1_status = types_fout_cp_nb.pivot_table(
+        index=indexer, columns='lnfase', values='status').fillna(1).reset_index()
     df_types_2_ = types_fout_cp_al.pivot_table(index=indexer, columns='lnfase', values='totaal').fillna(0).reset_index()
-    df_types_2_status = types_fout_cp_al.pivot_table(index=indexer, columns='lnfase', values='status').fillna(1).reset_index()
+    df_types_2_status = types_fout_cp_al.pivot_table(
+        index=indexer, columns='lnfase', values='status').fillna(1).reset_index()
 
     indexer = ['con_request', 'con_object', 'con_payment']
-    df_types_3_ = types_fout_con.pivot_table(index=indexer, columns='lnfase', values='totaal').fillna(0).reset_index()
-    df_types_3_status = types_fout_con.pivot_table(index=indexer, columns='lnfase', values='status').fillna(1).reset_index()
+    df_types_3_ = types_fout_con.pivot_table(
+        index=indexer, columns='lnfase', values='totaal').fillna(0).reset_index()
+    df_types_3_status = types_fout_con.pivot_table(
+        index=indexer, columns='lnfase', values='status').fillna(1).reset_index()
 
     # Inlezen van Xaris
     totaal_tabel = relevante_xaris.copy()
@@ -58,8 +74,10 @@ def fase_check():
     groupcount_f = relevante_xaris.groupby(['Con_status', 'Con_uitvoering', 'Status Xaris']).\
         agg({'juist_nummer': 'count', 'Mapping': 'first'}).\
         rename(columns={'juist_nummer': 'Totaal', 'Mapping': 'Kleuren'}).reset_index()
-    count_pivot_f = groupcount_f.pivot_table(index=['Con_status', 'Con_uitvoering'], columns='Status Xaris', values='Totaal').fillna(0).reset_index()
-    color_pivot_f = groupcount_f.pivot_table(index=['Con_status', 'Con_uitvoering'], columns='Status Xaris', values='Kleuren').fillna(0).reset_index()
+    count_pivot_f = groupcount_f.pivot_table(
+        index=['Con_status', 'Con_uitvoering'], columns='Status Xaris', values='Totaal').fillna(0).reset_index()
+    color_pivot_f = groupcount_f.pivot_table(
+        index=['Con_status', 'Con_uitvoering'], columns='Status Xaris', values='Kleuren').fillna(0).reset_index()
 
     xaris = {
         'types_1': types_fout_cp_nb,
