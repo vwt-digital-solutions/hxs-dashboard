@@ -1,3 +1,5 @@
+[![CodeFactor](https://www.codefactor.io/repository/github/vwt-digital/hxs-dashboard/badge)](https://www.codefactor.io/repository/github/vwt-digital/hxs-dashboard)
+
 # HXS Dashboard
 
 This repository contains the dashboard for Hybrid Access project related data, build with Dash.
