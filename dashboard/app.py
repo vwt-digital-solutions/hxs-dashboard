@@ -7,10 +7,15 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import os
 from flask_sslify import SSLify
+from flask_cors import CORS
 
 server = flask.Flask(__name__)
+
 if 'GAE_INSTANCE' in os.environ:
     SSLify(server, permanent=True)
+    CORS(server, origins=config.ORIGINS)
+else:
+    CORS(server)
 
 app = dash.Dash(
     __name__,
