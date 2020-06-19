@@ -20,7 +20,7 @@ app = dash.Dash(
     server=server
 )
 app.title = f"[{config.environment}] {config.title}"
-app.config.supress_callback_exceptions = True
+app.config.suppress_callback_exceptions = True
 app.scripts.config.serve_locally = False
 
 

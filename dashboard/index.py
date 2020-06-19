@@ -345,7 +345,7 @@ def download():
     return flask.send_file(
         strIO,
         as_attachment=True,
-        **send_info,
+        **send_info
     )
 
 
