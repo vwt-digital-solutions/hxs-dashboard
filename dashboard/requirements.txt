@@ -20,7 +20,7 @@ pyOpenSSL==19.0.0
 gunicorn==19.5.0
 google-cloud-kms==1.1.0
 PyPDF2==1.26.0
-plotly==3.10.0
+plotly==4.8.2
 gcsfs==0.3.1
 Flask-SSLify==0.1.5
 Flask-Cors==3.0.8
