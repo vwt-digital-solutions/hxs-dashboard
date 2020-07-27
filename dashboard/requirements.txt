@@ -26,3 +26,4 @@ Flask-SSLify==0.1.5
 Flask-Cors==3.0.8
 mysqlclient==1.4.6
 mysql-connector==2.2.9
+google-cloud-secret-manager==1.0.0
