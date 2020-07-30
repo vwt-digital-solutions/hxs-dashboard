@@ -5,12 +5,9 @@ import sqlalchemy as sa
 from datetime import datetime as dt
 
 
-DB_PASSWORD = utils.decrypt_secret(
+DB_PASSWORD = utils.get_secret(
     config.database['project_id'],
-    config.database['kms_region'],
-    config.database['kms_keyring'],
-    config.database['kms_key'],
-    config.database['enc_password']
+    config.database['secret_name']
 )
 
 if 'db_ip' in config.database:

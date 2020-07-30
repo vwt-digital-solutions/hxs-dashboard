@@ -26,14 +26,6 @@ app.scripts.config.serve_locally = False
 
 if config.authentication:
     auth = config.authentication
-    secret_base64 = auth['encrypted_session_secret']
-    auth['session_secret'] = utils.decrypt_secret(
-        auth['kms_project'],
-        auth['kms_region'],
-        auth['kms_keyring'],
-        auth['kms_key'],
-        secret_base64
-    )
     auth = authentication.AzureOAuth(
         app,
         auth['client_id'],
@@ -42,7 +34,7 @@ if config.authentication:
         auth['expected_audience'],
         auth['jwks_url'],
         auth['tenant'],
-        auth['session_secret'],
+        utils.get_secret(auth['project_id'], auth['secret_name']),
         auth['required_scopes'],
         e2e_expected_audience=auth.get('e2e_expected_audience', None),
         e2e_client_id=auth.get('e2e_client_id', None)
