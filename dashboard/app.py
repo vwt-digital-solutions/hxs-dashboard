@@ -7,8 +7,10 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import os
 from flask_sslify import SSLify
+from flask_behind_proxy import FlaskBehindProxy
 
 server = flask.Flask(__name__)
+FlaskBehindProxy(server)
 
 if 'GAE_INSTANCE' in os.environ:
     SSLify(server, permanent=True)

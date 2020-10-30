@@ -26,3 +26,4 @@ Flask-Cors==3.0.8
 mysqlclient==1.4.6
 mysql-connector==2.2.9
 google-cloud-secret-manager==1.0.0
+flask-behind-proxy==0.1.1
