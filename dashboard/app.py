@@ -36,9 +36,8 @@ if config.authentication:
         auth['tenant'],
         utils.get_secret(auth['project_id'], auth['secret_name']),
         auth['required_scopes'],
-        auth.get('redirect_url', None),
         e2e_expected_audience=auth.get('e2e_expected_audience', None),
-        e2e_client_id=auth.get('e2e_client_id', None),
+        e2e_client_id=auth.get('e2e_client_id', None)
     )
 
 
