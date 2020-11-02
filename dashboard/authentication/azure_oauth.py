@@ -19,12 +19,13 @@ from .auth import Auth
 
 class AzureOAuth(Auth):
     def __init__(self, app, client_id, client_secret, expected_issuer, expected_audience, jwks_url, tenant,
-                 session_secret, scopes=None, e2e_expected_audience=None, e2e_client_id=None):
+                 session_secret, scopes=None, redirect_url=None, e2e_expected_audience=None, e2e_client_id=None):
         super(AzureOAuth, self).__init__(app)
         azure_bp = make_azure_blueprint(
             client_id=client_id,
             client_secret=client_secret,
             scope=scopes,
+            redirect_url=redirect_url,
             tenant=tenant,
         )
         app.server.register_blueprint(azure_bp, url_prefix="/login")
