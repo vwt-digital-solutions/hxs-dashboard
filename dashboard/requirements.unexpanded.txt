@@ -9,13 +9,13 @@ ua-parser==0.8.0
 xlrd==1.2.0
 xlsxwriter==1.1.8
 pymysql==0.9.3
-requests==2.22.0
+requests==2.25.1
 requests-toolbelt==0.9.1
-google-auth == 1.17.2
-google-api-core==1.20.0
-google-api-python-client == 1.7.8
+google-auth == 1.26.0
+google-api-core==1.26.0
+google-api-python-client == 1.12.8
 google-cloud-storage == 1.16.1
-jwkaas==0.4
+jwkaas==0.9
 pyOpenSSL==19.0.0
 gunicorn==19.5.0
 PyPDF2==1.26.0
