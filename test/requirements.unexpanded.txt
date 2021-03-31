@@ -5,3 +5,7 @@ selenium
 webdrivermanager
 PyMySQL
 pymysql2
+pymysql
+mysql-connector-python
+SQLAlchemy
+virtualenv
