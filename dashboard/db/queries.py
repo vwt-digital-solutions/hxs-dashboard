@@ -428,7 +428,7 @@ def insert(session, data_dict, sourceTag, sourceKey='sourceKey', valueDate=None,
     session.flush()
 
 
-def read(session, sourceTag=None, key=[], measure=[], ts=None, stagingSourceTag=None):
+def read(session, sourceTag=None, key=[], measure=[], ts=None, stagingSourceTag=None):  # noqa: C901
     # Keys in list
     if isinstance(key, str):
         key = [key]
