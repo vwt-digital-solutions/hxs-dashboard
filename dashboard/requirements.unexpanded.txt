@@ -28,3 +28,6 @@ google-cloud-secret-manager==1.0.0
 virtualenv==20.4.3
 PyMySQL
 pymysql2
+pymysql
+mysql-connector-python
+SQLAlchemy
