@@ -4,3 +4,4 @@ requests
 selenium
 webdrivermanager
 PyMySQL
+pymysql2
