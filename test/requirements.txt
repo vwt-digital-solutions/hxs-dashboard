@@ -5,6 +5,7 @@ chardet==4.0.0
 distlib==0.3.1
 idna==2.10
 lxml==4.6.3
+PyMySQL==1.0.2
 requests==2.25.1
 selenium==3.141.0
 soupsieve==2.2.1
