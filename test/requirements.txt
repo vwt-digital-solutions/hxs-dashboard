@@ -19,7 +19,7 @@ soupsieve==2.2.1
 SQLAlchemy==1.4.4
 tqdm==4.59.0
 typing-extensions==3.7.4.3
-urllib3==1.26.4
+urllib3==1.26.5
 virtualenv==20.4.3
 webdrivermanager==0.10.0
 zipp==3.4.1
